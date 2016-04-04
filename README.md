@@ -50,11 +50,9 @@ $ ./gin-boilerplate
 You can import from this [link](https://www.getpostman.com/collections/ac0680f90961bafd5de7). If you don't have **Postman**, check this link [https://www.getpostman.com](https://www.getpostman.com/)
 
 ## Contribution
-You are welcome to contribute to keep it up to date and always improving!
----
 
-## Credits
-[Omar Massad](https://github.com/Massad)
+You are welcome to contribute to keep it up to date and always improving!
+
 ---
 
 ## License
