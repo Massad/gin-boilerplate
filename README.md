@@ -17,7 +17,7 @@ The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic
 ### Installation
 
 ```
-$ get clone https://github.com/Massad/gin-boilerplate.git
+$ git clone https://github.com/Massad/gin-boilerplate.git
 ```
 
 ```
