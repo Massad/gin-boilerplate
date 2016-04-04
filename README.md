@@ -28,6 +28,8 @@ $ cd gin-boilerplate/
 $ go install  
 ```
 
+You will find the database.sql in `db/database.sql`
+
 ## Running Your Application
 
 ```
