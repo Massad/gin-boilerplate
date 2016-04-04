@@ -1,3 +1,5 @@
+![alt tag](https://upload.wikimedia.org/wikipedia/commons/2/23/Golang.png)
+
 Welcome to **Golang Gin boilerplate**!
 
 The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic.github.io/gin/) with a structured project that defaults to **PostgreSQL** database and **Redis** as the session storage.
