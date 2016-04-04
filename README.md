@@ -11,6 +11,8 @@ The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic
 * Public
 
 ## Configured with
+
+[![Join the chat at https://gitter.im/Massad/gin-boilerplate](https://badges.gitter.im/Massad/gin-boilerplate.svg)](https://gitter.im/Massad/gin-boilerplate?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 * [go-gorp](github.com/go-gorp/gorp): Go Relational Persistence
 * [RedisStore](https://github.com/gin-gonic/contrib/tree/master/sessions): Gin middleware for session management with multi-backend support (currently cookie, Redis).
 * Built-in **CORS Middleware**
