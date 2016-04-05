@@ -1,22 +1,18 @@
 ![alt tag](https://upload.wikimedia.org/wikipedia/commons/2/23/Golang.png)
 
+[![Join the chat at https://gitter.im/Massad/gin-boilerplate](https://badges.gitter.im/Massad/gin-boilerplate.svg)](https://gitter.im/Massad/gin-boilerplate?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Welcome to **Golang Gin boilerplate**!
 
 The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic.github.io/gin/) with a structured project that defaults to **PostgreSQL** database and **Redis** as the session storage.
 
-* Controllers
-* Models
-* Forms
-* DB
-* Public
-
 ## Configured with
 
-[![Join the chat at https://gitter.im/Massad/gin-boilerplate](https://badges.gitter.im/Massad/gin-boilerplate.svg)](https://gitter.im/Massad/gin-boilerplate?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 * [go-gorp](github.com/go-gorp/gorp): Go Relational Persistence
 * [RedisStore](https://github.com/gin-gonic/contrib/tree/master/sessions): Gin middleware for session management with multi-backend support (currently cookie, Redis).
 * Built-in **CORS Middleware**
 * Feature **PostgreSQL 9.4** JSON queries
+* Unit test
 
 ### Installation
 
@@ -50,12 +46,21 @@ $ go build
 $ ./gin-boilerplate
 ```
 
+## Testing Your Application
+
+```
+$ go test -v ./tests/*
+```
+
+
 ## Import Postman Collection (API's)
 You can import from this [link](https://www.getpostman.com/collections/ac0680f90961bafd5de7). If you don't have **Postman**, check this link [https://www.getpostman.com](https://www.getpostman.com/)
 
 ## Contribution
 
 You are welcome to contribute to keep it up to date and always improving!
+
+If you have any question or need help, drop a message at [https://gitter.im/Massad/gin-boilerplate](https://gitter.im/Massad/gin-boilerplate)
 
 ---
 

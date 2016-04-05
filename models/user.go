@@ -69,7 +69,7 @@ func Register(form forms.RegisterForm) (user User, err error) {
 	if res != nil && err == nil {
 		err = getDb.SelectOne(&user, "SELECT id, email, name, updated_at, created_at FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
 		if err == nil {
-			return user, errors.New("Registered")
+			return user, nil
 		}
 	}
 

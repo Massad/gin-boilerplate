@@ -19,9 +19,9 @@ func Login(c *gin.Context) {
 			session := sessions.Default(c)
 			session.Set("user_id", user.ID)
 			session.Save()
-			c.JSON(200, gin.H{"message": "Success login", "user": user})
+			c.JSON(200, gin.H{"message": "User logged in", "user": user})
 		} else {
-			c.JSON(406, gin.H{"message": "Invalid login details", "trace_error": err.Error()})
+			c.JSON(406, gin.H{"message": "Invalid login details", "error": err.Error()})
 		}
 	} else {
 		c.JSON(406, gin.H{"message": "Invalid login details", "form": loginForm})
@@ -35,13 +35,19 @@ func Register(c *gin.Context) {
 	if c.BindJSON(&registerForm) == nil {
 		user, err := models.Register(registerForm)
 
+		if err != nil {
+			c.JSON(406, gin.H{"message": err.Error()})
+			c.Abort()
+			return
+		}
+
 		if user.ID > 0 {
 			session := sessions.Default(c)
 			session.Set("userID", user.ID)
 			session.Save()
 			c.JSON(200, gin.H{"message": "Success register", "user": user})
 		} else {
-			c.JSON(406, gin.H{"message": err.Error()})
+			c.JSON(406, gin.H{"message": "Could not create a user", "error": err.Error()})
 		}
 	} else {
 		c.JSON(406, gin.H{"message": "Invalid register details", "form": registerForm})

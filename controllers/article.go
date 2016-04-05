@@ -26,15 +26,15 @@ func CreateArticle(c *gin.Context) {
 		return
 	}
 
-	err := models.CreateArticle(userID, articleForm)
+	articleID, err := models.CreateArticle(userID, articleForm)
 
-	if err != nil {
-		c.JSON(406, gin.H{"message": err.Error()})
+	if articleID > 0 && err != nil {
+		c.JSON(406, gin.H{"message": "Article could not be created", "error": err.Error()})
 		c.Abort()
 		return
 	}
 
-	c.JSON(200, gin.H{"status": 1})
+	c.JSON(200, gin.H{"message": "Article created", "id": articleID})
 }
 
 //GetArticle ...
@@ -48,10 +48,11 @@ func GetArticle(c *gin.Context) {
 	}
 
 	id := c.Param("id")
+
 	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
-		data := models.GetArticle(userID, id)
-		if data.ID == 0 {
-			c.JSON(404, gin.H{"Message": "Article not found"})
+		data, err := models.GetArticle(userID, id)
+		if err != nil {
+			c.JSON(404, gin.H{"Message": "Article not found", "error": err.Error()})
 			c.Abort()
 			return
 		}
@@ -71,7 +72,14 @@ func GetArticles(c *gin.Context) {
 		return
 	}
 
-	data := models.GetArticles(userID)
+	data, err := models.GetArticles(userID)
+
+	if err != nil {
+		c.JSON(406, gin.H{"Message": "Could not get the articles", "error": err.Error()})
+		c.Abort()
+		return
+	}
+
 	c.JSON(200, gin.H{"data": data})
 }
 
@@ -98,13 +106,13 @@ func UpdateArticle(c *gin.Context) {
 
 		err := models.UpdateArticle(userID, id, articleForm)
 		if err != nil {
-			c.JSON(406, gin.H{"Message": "Article could not be updated", "err": err.Error()})
+			c.JSON(406, gin.H{"Message": "Article could not be updated", "error": err.Error()})
 			c.Abort()
 			return
 		}
-		c.JSON(200, gin.H{"status": "1"})
+		c.JSON(200, gin.H{"message": "Article updated"})
 	} else {
-		c.JSON(404, gin.H{"Message": "Invalid parameter"})
+		c.JSON(404, gin.H{"Message": "Invalid parameter", "error": err.Error()})
 	}
 }
 
@@ -122,12 +130,12 @@ func DeleteArticle(c *gin.Context) {
 	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
 		err := models.DeleteArticle(userID, id)
 		if err != nil {
-			c.JSON(406, gin.H{"Message": "Article could not be deleted", "err": err.Error()})
+			c.JSON(406, gin.H{"Message": "Article could not be deleted", "error": err.Error()})
 			c.Abort()
 			return
 		}
-		c.JSON(200, gin.H{"status": "1"})
+		c.JSON(200, gin.H{"message": "Article deleted"})
 	} else {
-		c.JSON(404, gin.H{"Message": "Invalid parameter"})
+		c.JSON(404, gin.H{"Message": "Invalid parameter", "error": err.Error()})
 	}
 }

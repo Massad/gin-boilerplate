@@ -18,7 +18,6 @@ func CORSMiddleware() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, Origin, Authorization, Accept, Client-Security-Token, Accept-Encoding, x-access-token")
 		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("X-Powered-By", "Golang 1.6")
 
 		if c.Request.Method == "OPTIONS" {
 			fmt.Println("OPTIONS")
@@ -33,7 +32,7 @@ func main() {
 	r := gin.Default()
 
 	store, _ := sessions.NewRedisStore(10, "tcp", "localhost:6379", "", []byte("secret"))
-	r.Use(sessions.Sessions("golang-gin-session", store))
+	r.Use(sessions.Sessions("gin-boilerplate-session", store))
 
 	r.Use(CORSMiddleware())
 
@@ -52,11 +51,9 @@ func main() {
 		v1.GET("/articles", controllers.GetArticles)
 		v1.PUT("/article/:id", controllers.UpdateArticle)
 		v1.DELETE("/article/:id", controllers.DeleteArticle)
-
 	}
 
 	r.Static("/public", "./public")
 
 	r.Run(":9000")
-
 }

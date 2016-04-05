@@ -1,6 +1,5 @@
 package models
 
-//JSONRaw ...
 import (
 	"database/sql/driver"
 	"encoding/json"
@@ -8,6 +7,7 @@ import (
 	"regexp"
 )
 
+//JSONRaw ...
 type JSONRaw json.RawMessage
 
 //Value ...
