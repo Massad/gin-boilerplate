@@ -12,6 +12,7 @@ SET client_min_messages = warning;
 --
 -- Name: golang_gin_db; Type: DATABASE; Schema: -; Owner: postgres
 --
+DROP DATABASE golang_gin_db;
 
 CREATE DATABASE golang_gin_db WITH TEMPLATE = template0 ENCODING = 'UTF8' LC_COLLATE = 'en_US.UTF-8' LC_CTYPE = 'en_US.UTF-8';
 
@@ -28,14 +29,14 @@ SET check_function_bodies = false;
 SET client_min_messages = warning;
 
 --
--- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
+-- Name: plpgsql; Type: EXTENSION; Schema: -; Owner:
 --
 
 CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
 
 
 --
--- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner:
 --
 
 COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
@@ -48,7 +49,7 @@ SET default_tablespace = '';
 SET default_with_oids = false;
 
 --
--- Name: article; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+-- Name: article; Type: TABLE; Schema: public; Owner: postgres; Tablespace:
 --
 
 CREATE TABLE article (
@@ -85,7 +86,7 @@ ALTER SEQUENCE article_id_seq OWNED BY article.id;
 
 
 --
--- Name: user; Type: TABLE; Schema: public; Owner: postgres; Tablespace: 
+-- Name: user; Type: TABLE; Schema: public; Owner: postgres; Tablespace:
 --
 
 CREATE TABLE "user" (
@@ -166,7 +167,7 @@ SELECT pg_catalog.setval('user_id_seq', 1, false);
 
 
 --
--- Name: article_id; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+-- Name: article_id; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace:
 --
 
 ALTER TABLE ONLY article
@@ -174,7 +175,7 @@ ALTER TABLE ONLY article
 
 
 --
--- Name: user_id; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace: 
+-- Name: user_id; Type: CONSTRAINT; Schema: public; Owner: postgres; Tablespace:
 --
 
 ALTER TABLE ONLY "user"
@@ -190,16 +191,15 @@ ALTER TABLE ONLY article
 
 
 --
--- Name: public; Type: ACL; Schema: -; Owner: omar
+-- Name: public; Type: ACL; Schema: -; Owner: postgres
 --
 
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
-REVOKE ALL ON SCHEMA public FROM omar;
-GRANT ALL ON SCHEMA public TO omar;
+REVOKE ALL ON SCHEMA public FROM postgres;
+GRANT ALL ON SCHEMA public TO postgres;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 
 
 --
 -- PostgreSQL database dump complete
 --
-

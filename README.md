@@ -29,7 +29,17 @@ $ cd $GOPATH/src/github.com/Massad/gin-boilerplate
 $ go get -t -v ./...
 ```
 
-You will find the database.sql in `db/database.sql`
+> Sometimes you need to get this package manually
+```
+$ go get github.com/bmizerany/assert
+```
+
+You will find the **database.sql** in `db/database.sql`
+
+And you can import the postgres database using this command:
+```
+$ psql -U postgres -h localhost < ./db/database.sql
+```
 
 ## Running Your Application
 
