@@ -7,14 +7,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gin-boilerplate/controllers"
-	"gin-boilerplate/db"
-	"gin-boilerplate/forms"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/Massad/gin-boilerplate/controllers"
+	"github.com/Massad/gin-boilerplate/db"
+	"github.com/Massad/gin-boilerplate/forms"
 
 	"github.com/bmizerany/assert"
 	"github.com/gin-gonic/contrib/sessions"

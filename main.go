@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"gin-boilerplate/controllers"
-	"gin-boilerplate/db"
+
+	"github.com/Massad/gin-boilerplate/controllers"
+	"github.com/Massad/gin-boilerplate/db"
 
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"

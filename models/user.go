@@ -2,9 +2,10 @@ package models
 
 import (
 	"errors"
-	"gin-boilerplate/db"
-	"gin-boilerplate/forms"
 	"time"
+
+	"github.com/Massad/gin-boilerplate/db"
+	"github.com/Massad/gin-boilerplate/forms"
 
 	"golang.org/x/crypto/bcrypt"
 )

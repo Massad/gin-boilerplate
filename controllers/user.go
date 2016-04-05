@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	"gin-boilerplate/forms"
-	"gin-boilerplate/models"
+	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/Massad/gin-boilerplate/models"
 
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"

@@ -3,9 +3,10 @@ package models
 import (
 	"errors"
 	"fmt"
-	"gin-boilerplate/db"
-	"gin-boilerplate/forms"
 	"time"
+
+	"github.com/Massad/gin-boilerplate/db"
+	"github.com/Massad/gin-boilerplate/forms"
 )
 
 //Article ...

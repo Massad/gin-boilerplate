@@ -1,9 +1,10 @@
 package controllers
 
 import (
-	"gin-boilerplate/forms"
-	"gin-boilerplate/models"
 	"strconv"
+
+	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/Massad/gin-boilerplate/models"
 
 	"github.com/gin-gonic/gin"
 )

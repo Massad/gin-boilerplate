@@ -18,15 +18,15 @@ The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic
 ### Installation
 
 ```
-$ git clone https://github.com/Massad/gin-boilerplate.git
+$ go get github.com/Massad/gin-boilerplate
 ```
 
 ```
-$ cd gin-boilerplate/
+$ cd $GOPATH/src/github.com/Massad/gin-boilerplate
 ```
 
 ```
-$ go install  
+$ go get -t -v ./...
 ```
 
 You will find the database.sql in `db/database.sql`
@@ -40,7 +40,7 @@ $ go run *.go
 ## Building Your Application
 
 ```
-$ go build
+$ go build -v
 ```
 
 ```
