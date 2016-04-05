@@ -26,4 +26,5 @@ before_install:
   - sleep 3
 
 script:
+ - go get github.com/bmizerany/assert
  - go test -v ./tests/*
