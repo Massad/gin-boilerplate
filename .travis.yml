@@ -7,5 +7,23 @@ go:
  - release
  - tip
 
+services:
+  - redis-server
+
+addons:
+  postgresql: "9.4"
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - g++-4.8
+    - gcc-4.8
+    - clang
+before_install:
+  - "psql -U postgres -c 'create database golang_gin_db;'"
+  - "psql -U postgres golang_gin_db -c 'create extension postgis;'"
+  - "psql -U postgres < ./db/database.sql"
+  - sleep 3
+
 script:
  - go test -v ./tests/*
