@@ -37,56 +37,60 @@ func getSessionUserInfo(c *gin.Context) (userSessionInfo models.UserSessionInfo)
 func (ctrl UserController) Signin(c *gin.Context) {
 	var signinForm forms.SigninForm
 
-	if c.BindJSON(&signinForm) == nil {
-
-		userModel := new(models.UserModel)
-
-		user, err := userModel.Signin(signinForm)
-		if err == nil {
-			session := sessions.Default(c)
-			session.Set("user_id", user.ID)
-			session.Set("user_email", user.Email)
-			session.Set("user_name", user.Name)
-			session.Save()
-
-			c.JSON(200, gin.H{"message": "User signed in", "user": user})
-		} else {
-			c.JSON(406, gin.H{"message": "Invalid signin details", "error": err.Error()})
-		}
-	} else {
-		c.JSON(406, gin.H{"message": "Invalid signin details"})
+	if c.BindJSON(&signinForm) != nil {
+		c.JSON(406, gin.H{"message": "Invalid form", "form": signinForm})
+		c.Abort()
+		return
 	}
+
+	userModel := new(models.UserModel)
+
+	user, err := userModel.Signin(signinForm)
+	if err == nil {
+		session := sessions.Default(c)
+		session.Set("user_id", user.ID)
+		session.Set("user_email", user.Email)
+		session.Set("user_name", user.Name)
+		session.Save()
+
+		c.JSON(200, gin.H{"message": "User signed in", "user": user})
+	} else {
+		c.JSON(406, gin.H{"message": "Invalid signin details", "error": err.Error()})
+	}
+
 }
 
 //Signup ...
 func (ctrl UserController) Signup(c *gin.Context) {
 	var signupForm forms.SignupForm
 
-	if c.BindJSON(&signupForm) == nil {
-
-		userModel := new(models.UserModel)
-
-		user, err := userModel.Signup(signupForm)
-
-		if err != nil {
-			c.JSON(406, gin.H{"message": err.Error()})
-			c.Abort()
-			return
-		}
-
-		if user.ID > 0 {
-			session := sessions.Default(c)
-			session.Set("user_id", user.ID)
-			session.Set("user_email", user.Email)
-			session.Set("user_name", user.Name)
-			session.Save()
-			c.JSON(200, gin.H{"message": "Success signup", "user": user})
-		} else {
-			c.JSON(406, gin.H{"message": "Could not signup this user", "error": err.Error()})
-		}
-	} else {
-		c.JSON(406, gin.H{"message": "Invalid signup details"})
+	if c.BindJSON(&signupForm) != nil {
+		c.JSON(406, gin.H{"message": "Invalid form", "form": signupForm})
+		c.Abort()
+		return
 	}
+
+	userModel := new(models.UserModel)
+
+	user, err := userModel.Signup(signupForm)
+
+	if err != nil {
+		c.JSON(406, gin.H{"message": err.Error()})
+		c.Abort()
+		return
+	}
+
+	if user.ID > 0 {
+		session := sessions.Default(c)
+		session.Set("user_id", user.ID)
+		session.Set("user_email", user.Email)
+		session.Set("user_name", user.Name)
+		session.Save()
+		c.JSON(200, gin.H{"message": "Success signup", "user": user})
+	} else {
+		c.JSON(406, gin.H{"message": "Could not signup this user", "error": err.Error()})
+	}
+
 }
 
 //Signout ...

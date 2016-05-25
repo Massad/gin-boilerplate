@@ -241,12 +241,12 @@ func TestCreateInvalidArticle(t *testing.T) {
 }
 
 /**
-* TestCreateArticleNotLoggedIn
-* Test article creation with a not logged in user
+* TestCreateArticleNotSignedIn
+* Test article creation with a not signed in user
 *
 * Must return response code 403
  */
-func TestCreateArticleNotLoggedIn(t *testing.T) {
+func TestCreateArticleNotSignedIn(t *testing.T) {
 	testRouter := SetupRouter()
 
 	var articleForm forms.ArticleForm
