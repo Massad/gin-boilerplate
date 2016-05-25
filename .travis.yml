@@ -27,4 +27,4 @@ before_install:
 
 script:
  - go get github.com/bmizerany/assert
- - go test -v ./api/v1/tests/*
+ - go test -v ./tests/*
