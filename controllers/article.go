@@ -9,11 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//CreateArticle ...
-func CreateArticle(c *gin.Context) {
+//ArticleController ...
+type ArticleController struct{}
+
+//Create ...
+func (ctrl ArticleController) Create(c *gin.Context) {
 	userID := getUserID(c)
 
-	if userID <= 0 {
+	if userID == 0 {
 		c.JSON(403, gin.H{"message": "Please login first"})
 		c.Abort()
 		return
@@ -22,12 +25,14 @@ func CreateArticle(c *gin.Context) {
 	var articleForm forms.ArticleForm
 
 	if c.BindJSON(&articleForm) != nil {
-		c.JSON(406, gin.H{"message": "Invalid parameters", "form": articleForm})
+		c.JSON(406, gin.H{"message": "Invalid form", "form": articleForm})
 		c.Abort()
 		return
 	}
 
-	articleID, err := models.CreateArticle(userID, articleForm)
+	articleModel := new(models.ArticleModel)
+
+	articleID, err := articleModel.Create(userID, articleForm)
 
 	if articleID > 0 && err != nil {
 		c.JSON(406, gin.H{"message": "Article could not be created", "error": err.Error()})
@@ -38,11 +43,34 @@ func CreateArticle(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Article created", "id": articleID})
 }
 
-//GetArticle ...
-func GetArticle(c *gin.Context) {
+//All ...
+func (ctrl ArticleController) All(c *gin.Context) {
 	userID := getUserID(c)
 
-	if userID <= 0 {
+	if userID == 0 {
+		c.JSON(403, gin.H{"message": "Please login first"})
+		c.Abort()
+		return
+	}
+
+	articleModel := new(models.ArticleModel)
+
+	data, err := articleModel.All(userID)
+
+	if err != nil {
+		c.JSON(406, gin.H{"Message": "Could not get the articles", "error": err.Error()})
+		c.Abort()
+		return
+	}
+
+	c.JSON(200, gin.H{"data": data})
+}
+
+//One ...
+func (ctrl ArticleController) One(c *gin.Context) {
+	userID := getUserID(c)
+
+	if userID == 0 {
 		c.JSON(403, gin.H{"message": "Please login first"})
 		c.Abort()
 		return
@@ -51,7 +79,10 @@ func GetArticle(c *gin.Context) {
 	id := c.Param("id")
 
 	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
-		data, err := models.GetArticle(userID, id)
+
+		articleModel := new(models.ArticleModel)
+
+		data, err := articleModel.One(userID, id)
 		if err != nil {
 			c.JSON(404, gin.H{"Message": "Article not found", "error": err.Error()})
 			c.Abort()
@@ -63,32 +94,11 @@ func GetArticle(c *gin.Context) {
 	}
 }
 
-//GetArticles ...
-func GetArticles(c *gin.Context) {
+//Update ...
+func (ctrl ArticleController) Update(c *gin.Context) {
 	userID := getUserID(c)
 
-	if userID <= 0 {
-		c.JSON(403, gin.H{"message": "Please login first"})
-		c.Abort()
-		return
-	}
-
-	data, err := models.GetArticles(userID)
-
-	if err != nil {
-		c.JSON(406, gin.H{"Message": "Could not get the articles", "error": err.Error()})
-		c.Abort()
-		return
-	}
-
-	c.JSON(200, gin.H{"data": data})
-}
-
-//UpdateArticle ...
-func UpdateArticle(c *gin.Context) {
-	userID := getUserID(c)
-
-	if userID <= 0 {
+	if userID == 0 {
 		c.JSON(403, gin.H{"message": "Please login first"})
 		c.Abort()
 		return
@@ -105,7 +115,9 @@ func UpdateArticle(c *gin.Context) {
 			return
 		}
 
-		err := models.UpdateArticle(userID, id, articleForm)
+		articleModel := new(models.ArticleModel)
+
+		err := articleModel.Update(userID, id, articleForm)
 		if err != nil {
 			c.JSON(406, gin.H{"Message": "Article could not be updated", "error": err.Error()})
 			c.Abort()
@@ -117,11 +129,11 @@ func UpdateArticle(c *gin.Context) {
 	}
 }
 
-//DeleteArticle ...
-func DeleteArticle(c *gin.Context) {
+//Delete ...
+func (ctrl ArticleController) Delete(c *gin.Context) {
 	userID := getUserID(c)
 
-	if userID <= 0 {
+	if userID == 0 {
 		c.JSON(403, gin.H{"message": "Please login first"})
 		c.Abort()
 		return
@@ -129,7 +141,10 @@ func DeleteArticle(c *gin.Context) {
 
 	id := c.Param("id")
 	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
-		err := models.DeleteArticle(userID, id)
+
+		articleModel := new(models.ArticleModel)
+
+		err := articleModel.Delete(userID, id)
 		if err != nil {
 			c.JSON(406, gin.H{"Message": "Article could not be deleted", "error": err.Error()})
 			c.Abort()
@@ -137,6 +152,6 @@ func DeleteArticle(c *gin.Context) {
 		}
 		c.JSON(200, gin.H{"message": "Article deleted"})
 	} else {
-		c.JSON(404, gin.H{"Message": "Invalid parameter", "error": err.Error()})
+		c.JSON(404, gin.H{"Message": "Invalid parameter"})
 	}
 }

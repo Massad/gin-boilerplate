@@ -20,8 +20,11 @@ type User struct {
 	CreatedAt int64  `db:"created_at" json:"created_at"`
 }
 
-//Login ...
-func Login(form forms.LoginForm) (user User, err error) {
+//UserModel ...
+type UserModel struct{}
+
+//Signin ...
+func (m UserModel) Signin(form forms.SigninForm) (user User, err error) {
 
 	err = db.GetDB().SelectOne(&user, "SELECT id, email, password, name, updated_at, created_at FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
 
@@ -41,13 +44,9 @@ func Login(form forms.LoginForm) (user User, err error) {
 	return user, nil
 }
 
-//Register ...
-func Register(form forms.RegisterForm) (user User, err error) {
+//Signup ...
+func (m UserModel) Signup(form forms.SignupForm) (user User, err error) {
 	getDb := db.GetDB()
-
-	if !validateEmail(form.Email) {
-		return user, errors.New("Email address is invalid")
-	}
 
 	checkUser, err := getDb.SelectInt("SELECT count(id) FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
 
@@ -77,16 +76,8 @@ func Register(form forms.RegisterForm) (user User, err error) {
 	return user, errors.New("Not registered")
 }
 
-//GetUsers ...
-func GetUsers() (u []User, err error) {
-	var users []User
-	_, err = db.GetDB().Select(&users, "SELECT * from public.user")
-	return users, err
-}
-
-//CheckUser ...
-func CheckUser(userID int64) (err error) {
-	var user User
-	err = db.GetDB().SelectOne(&user, "SELECT id FROM public.user WHERE id=$1", userID)
-	return err
+//One ...
+func (m UserModel) One(userID int64) (user User, err error) {
+	err = db.GetDB().SelectOne(&user, "SELECT id, email, name FROM public.user WHERE id=$1", userID)
+	return user, err
 }

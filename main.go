@@ -42,16 +42,20 @@ func main() {
 	v1 := r.Group("/v1")
 	{
 		/*** START USER ***/
-		v1.POST("/user/login", controllers.Login)
-		v1.POST("/user/register", controllers.Register)
-		v1.GET("/user/logout", controllers.Logout)
+		user := new(controllers.UserController)
+
+		v1.POST("/user/signin", user.Signin)
+		v1.POST("/user/signup", user.Signup)
+		v1.GET("/user/signout", user.Signout)
 
 		/*** START Article ***/
-		v1.POST("/article", controllers.CreateArticle)
-		v1.GET("/article/:id", controllers.GetArticle)
-		v1.GET("/articles", controllers.GetArticles)
-		v1.PUT("/article/:id", controllers.UpdateArticle)
-		v1.DELETE("/article/:id", controllers.DeleteArticle)
+		article := new(controllers.ArticleController)
+
+		v1.POST("/article", article.Create)
+		v1.GET("/articles", article.All)
+		v1.GET("/article/:id", article.One)
+		v1.PUT("/article/:id", article.Update)
+		v1.DELETE("/article/:id", article.Delete)
 	}
 
 	r.Static("/public", "./public")

@@ -4,8 +4,15 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"regexp"
+	"reflect"
 )
+
+//UserSessionInfo ...
+type UserSessionInfo struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
 
 //JSONRaw ...
 type JSONRaw json.RawMessage
@@ -43,8 +50,10 @@ func (j *JSONRaw) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-//validateEmail ...
-func validateEmail(email string) bool {
-	Re := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
-	return Re.MatchString(email)
+//ConvertToInt64 ...
+func ConvertToInt64(number interface{}) int64 {
+	if reflect.TypeOf(number).String() == "int" {
+		return int64(number.(int))
+	}
+	return number.(int64)
 }

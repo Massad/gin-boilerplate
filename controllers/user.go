@@ -8,32 +8,65 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//Login ...
-func Login(c *gin.Context) {
-	var loginForm forms.LoginForm
+//UserController ...
+type UserController struct{}
 
-	if c.BindJSON(&loginForm) == nil {
+//getUserID ...
+func getUserID(c *gin.Context) int64 {
+	session := sessions.Default(c)
+	userID := session.Get("user_id")
+	if userID != nil {
+		return models.ConvertToInt64(userID)
+	}
+	return 0
+}
 
-		user, err := models.Login(loginForm)
+//getSessionUserInfo ...
+func getSessionUserInfo(c *gin.Context) (userSessionInfo models.UserSessionInfo) {
+	session := sessions.Default(c)
+	userID := session.Get("user_id")
+	if userID != nil {
+		userSessionInfo.ID = models.ConvertToInt64(userID)
+		userSessionInfo.Name = session.Get("user_name").(string)
+		userSessionInfo.Email = session.Get("user_email").(string)
+	}
+	return userSessionInfo
+}
+
+//Signin ...
+func (ctrl UserController) Signin(c *gin.Context) {
+	var signinForm forms.SigninForm
+
+	if c.BindJSON(&signinForm) == nil {
+
+		userModel := new(models.UserModel)
+
+		user, err := userModel.Signin(signinForm)
 		if err == nil {
 			session := sessions.Default(c)
 			session.Set("user_id", user.ID)
+			session.Set("user_email", user.Email)
+			session.Set("user_name", user.Name)
 			session.Save()
-			c.JSON(200, gin.H{"message": "User logged in", "user": user})
+
+			c.JSON(200, gin.H{"message": "User signed in", "user": user})
 		} else {
-			c.JSON(406, gin.H{"message": "Invalid login details", "error": err.Error()})
+			c.JSON(406, gin.H{"message": "Invalid signin details", "error": err.Error()})
 		}
 	} else {
-		c.JSON(406, gin.H{"message": "Invalid login details", "form": loginForm})
+		c.JSON(406, gin.H{"message": "Invalid signin details"})
 	}
 }
 
-//Register ...
-func Register(c *gin.Context) {
-	var registerForm forms.RegisterForm
+//Signup ...
+func (ctrl UserController) Signup(c *gin.Context) {
+	var signupForm forms.SignupForm
 
-	if c.BindJSON(&registerForm) == nil {
-		user, err := models.Register(registerForm)
+	if c.BindJSON(&signupForm) == nil {
+
+		userModel := new(models.UserModel)
+
+		user, err := userModel.Signup(signupForm)
 
 		if err != nil {
 			c.JSON(406, gin.H{"message": err.Error()})
@@ -43,39 +76,23 @@ func Register(c *gin.Context) {
 
 		if user.ID > 0 {
 			session := sessions.Default(c)
-			session.Set("userID", user.ID)
+			session.Set("user_id", user.ID)
+			session.Set("user_email", user.Email)
+			session.Set("user_name", user.Name)
 			session.Save()
-			c.JSON(200, gin.H{"message": "Success register", "user": user})
+			c.JSON(200, gin.H{"message": "Success signup", "user": user})
 		} else {
-			c.JSON(406, gin.H{"message": "Could not create a user", "error": err.Error()})
+			c.JSON(406, gin.H{"message": "Could not signup this user", "error": err.Error()})
 		}
 	} else {
-		c.JSON(406, gin.H{"message": "Invalid register details", "form": registerForm})
+		c.JSON(406, gin.H{"message": "Invalid signup details"})
 	}
 }
 
-//Logout ...
-func Logout(c *gin.Context) {
+//Signout ...
+func (ctrl UserController) Signout(c *gin.Context) {
 	session := sessions.Default(c)
-	session.Set("user_id", nil)
+	session.Clear()
 	session.Save()
-	c.JSON(200, nil)
-}
-
-//getUserID ...
-func getUserID(c *gin.Context) int64 {
-	session := sessions.Default(c)
-	userID := session.Get("user_id")
-	if userID != nil {
-		var i64 int64
-		i64 = int64(userID.(int))
-		return i64
-	}
-	return 0
-}
-
-//GetUsers ...
-func GetUsers(c *gin.Context) {
-	data, _ := models.GetUsers()
-	c.JSON(200, data)
+	c.JSON(200, gin.H{"message": "Signed out..."})
 }
