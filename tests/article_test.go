@@ -32,16 +32,20 @@ func SetupRouter() *gin.Engine {
 	v1 := r.Group("/v1")
 	{
 		/*** START USER ***/
-		v1.POST("/user/login", controllers.Login)
-		v1.POST("/user/register", controllers.Register)
-		v1.GET("/user/logout", controllers.Logout)
+		user := new(controllers.UserController)
+
+		v1.POST("/user/signin", user.Signin)
+		v1.POST("/user/signup", user.Signup)
+		v1.GET("/user/signout", user.Signout)
 
 		/*** START Article ***/
-		v1.POST("/article", controllers.CreateArticle)
-		v1.GET("/article/:id", controllers.GetArticle)
-		v1.GET("/articles", controllers.GetArticles)
-		v1.PUT("/article/:id", controllers.UpdateArticle)
-		v1.DELETE("/article/:id", controllers.DeleteArticle)
+		article := new(controllers.ArticleController)
+
+		v1.POST("/article", article.Create)
+		v1.GET("/articles", article.All)
+		v1.GET("/article/:id", article.One)
+		v1.PUT("/article/:id", article.Update)
+		v1.DELETE("/article/:id", article.Delete)
 	}
 
 	return r
@@ -52,7 +56,7 @@ func main() {
 	r.Run()
 }
 
-var loginCookie string
+var signinCookie string
 
 var testEmail = "test-gin-boilerplate@test.com"
 var testPassword = "123456"
@@ -70,23 +74,23 @@ func TestIntDB(t *testing.T) {
 }
 
 /**
-* TestRegister
+* TestSignup
 * Test user registration
 *
 * Must return response code 200
  */
-func TestRegister(t *testing.T) {
+func TestSignup(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var registerForm forms.RegisterForm
+	var signupForm forms.SignupForm
 
-	registerForm.Name = "testing"
-	registerForm.Email = testEmail
-	registerForm.Password = testPassword
+	signupForm.Name = "testing"
+	signupForm.Email = testEmail
+	signupForm.Password = testPassword
 
-	data, _ := json.Marshal(registerForm)
+	data, _ := json.Marshal(signupForm)
 
-	req, err := http.NewRequest("POST", "/v1/user/register", bytes.NewBufferString(string(data)))
+	req, err := http.NewRequest("POST", "/v1/user/signup", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
@@ -100,23 +104,23 @@ func TestRegister(t *testing.T) {
 }
 
 /**
-* TestRegisterInvalidEmail
+* TestSignupInvalidEmail
 * Test user registration with invalid email
 *
 * Must return response code 406
  */
-func TestRegisterInvalidEmail(t *testing.T) {
+func TestSignupInvalidEmail(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var registerForm forms.RegisterForm
+	var signupForm forms.SignupForm
 
-	registerForm.Name = "testing"
-	registerForm.Email = "invalid@email"
-	registerForm.Password = testPassword
+	signupForm.Name = "testing"
+	signupForm.Email = "invalid@email"
+	signupForm.Password = testPassword
 
-	data, _ := json.Marshal(registerForm)
+	data, _ := json.Marshal(signupForm)
 
-	req, err := http.NewRequest("POST", "/v1/user/register", bytes.NewBufferString(string(data)))
+	req, err := http.NewRequest("POST", "/v1/user/signup", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
@@ -130,23 +134,23 @@ func TestRegisterInvalidEmail(t *testing.T) {
 }
 
 /**
-* TestLogin
-* Test user login
-* and store the cookie on local variable [loginCookie]
+* TestSignin
+* Test user signin
+* and store the cookie on local variable [signinCookie]
 *
 * Must return response code 200
  */
-func TestLogin(t *testing.T) {
+func TestSignin(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var loginForm forms.LoginForm
+	var signinForm forms.SigninForm
 
-	loginForm.Email = testEmail
-	loginForm.Password = testPassword
+	signinForm.Email = testEmail
+	signinForm.Password = testPassword
 
-	data, _ := json.Marshal(loginForm)
+	data, _ := json.Marshal(signinForm)
 
-	req, err := http.NewRequest("POST", "/v1/user/login", bytes.NewBufferString(string(data)))
+	req, err := http.NewRequest("POST", "/v1/user/signin", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
@@ -157,7 +161,7 @@ func TestLogin(t *testing.T) {
 
 	testRouter.ServeHTTP(resp, req)
 
-	loginCookie = resp.Header().Get("Set-Cookie")
+	signinCookie = resp.Header().Get("Set-Cookie")
 
 	assert.Equal(t, resp.Code, 200)
 }
@@ -180,7 +184,7 @@ func TestCreateArticle(t *testing.T) {
 
 	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Cookie", loginCookie)
+	req.Header.Set("Cookie", signinCookie)
 
 	if err != nil {
 		fmt.Println(err)
@@ -224,7 +228,7 @@ func TestCreateInvalidArticle(t *testing.T) {
 
 	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Cookie", loginCookie)
+	req.Header.Set("Cookie", signinCookie)
 
 	if err != nil {
 		fmt.Println(err)
@@ -277,7 +281,7 @@ func TestGetArticle(t *testing.T) {
 	url := fmt.Sprintf("/v1/article/%d", articleID)
 
 	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("Cookie", loginCookie)
+	req.Header.Set("Cookie", signinCookie)
 
 	if err != nil {
 		fmt.Println(err)
@@ -299,7 +303,7 @@ func TestGetInvalidArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
 	req, err := http.NewRequest("GET", "/v1/article/invalid", nil)
-	req.Header.Set("Cookie", loginCookie)
+	req.Header.Set("Cookie", signinCookie)
 
 	if err != nil {
 		fmt.Println(err)
@@ -331,7 +335,7 @@ func TestUpdateArticle(t *testing.T) {
 
 	req, err := http.NewRequest("PUT", url, bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Cookie", loginCookie)
+	req.Header.Set("Cookie", signinCookie)
 
 	if err != nil {
 		fmt.Println(err)
@@ -355,7 +359,7 @@ func TestDeleteArticle(t *testing.T) {
 	url := fmt.Sprintf("/v1/article/%d", articleID)
 
 	req, err := http.NewRequest("DELETE", url, nil)
-	req.Header.Set("Cookie", loginCookie)
+	req.Header.Set("Cookie", signinCookie)
 
 	if err != nil {
 		fmt.Println(err)
@@ -368,15 +372,15 @@ func TestDeleteArticle(t *testing.T) {
 }
 
 /**
-* TestUserLogout
-* Test logout a user
+* TestUserSignout
+* Test signout a user
 *
 * Must return response code 200
  */
-func TestUserLogout(t *testing.T) {
+func TestUserSignout(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", "/v1/user/logout", nil)
+	req, err := http.NewRequest("GET", "/v1/user/signout", nil)
 
 	if err != nil {
 		fmt.Println(err)
