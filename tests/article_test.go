@@ -130,7 +130,7 @@ func TestSignupInvalidEmail(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 406)
+	assert.Equal(t, resp.Code, 400) //406
 }
 
 /**
@@ -237,7 +237,7 @@ func TestCreateInvalidArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 406)
+	assert.Equal(t, resp.Code, 400) //406
 }
 
 /**
