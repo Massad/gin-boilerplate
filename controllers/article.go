@@ -12,6 +12,8 @@ import (
 //ArticleController ...
 type ArticleController struct{}
 
+var articleModel = new(models.ArticleModel)
+
 //Create ...
 func (ctrl ArticleController) Create(c *gin.Context) {
 	userID := getUserID(c)
@@ -29,8 +31,6 @@ func (ctrl ArticleController) Create(c *gin.Context) {
 		c.Abort()
 		return
 	}
-
-	articleModel := new(models.ArticleModel)
 
 	articleID, err := articleModel.Create(userID, articleForm)
 
@@ -52,8 +52,6 @@ func (ctrl ArticleController) All(c *gin.Context) {
 		c.Abort()
 		return
 	}
-
-	articleModel := new(models.ArticleModel)
 
 	data, err := articleModel.All(userID)
 
@@ -79,8 +77,6 @@ func (ctrl ArticleController) One(c *gin.Context) {
 	id := c.Param("id")
 
 	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
-
-		articleModel := new(models.ArticleModel)
 
 		data, err := articleModel.One(userID, id)
 		if err != nil {
@@ -115,8 +111,6 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 			return
 		}
 
-		articleModel := new(models.ArticleModel)
-
 		err := articleModel.Update(userID, id, articleForm)
 		if err != nil {
 			c.JSON(406, gin.H{"Message": "Article could not be updated", "error": err.Error()})
@@ -141,8 +135,6 @@ func (ctrl ArticleController) Delete(c *gin.Context) {
 
 	id := c.Param("id")
 	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
-
-		articleModel := new(models.ArticleModel)
 
 		err := articleModel.Delete(userID, id)
 		if err != nil {

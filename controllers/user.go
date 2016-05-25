@@ -11,6 +11,8 @@ import (
 //UserController ...
 type UserController struct{}
 
+var userModel = new(models.UserModel)
+
 //getUserID ...
 func getUserID(c *gin.Context) int64 {
 	session := sessions.Default(c)
@@ -43,8 +45,6 @@ func (ctrl UserController) Signin(c *gin.Context) {
 		return
 	}
 
-	userModel := new(models.UserModel)
-
 	user, err := userModel.Signin(signinForm)
 	if err == nil {
 		session := sessions.Default(c)
@@ -69,8 +69,6 @@ func (ctrl UserController) Signup(c *gin.Context) {
 		c.Abort()
 		return
 	}
-
-	userModel := new(models.UserModel)
 
 	user, err := userModel.Signup(signupForm)
 
