@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"runtime"
 
 	"github.com/Massad/gin-boilerplate/controllers"
 	"github.com/Massad/gin-boilerplate/db"
@@ -58,7 +60,20 @@ func main() {
 		v1.DELETE("/article/:id", article.Delete)
 	}
 
+	r.LoadHTMLGlob("./public/html/*")
+
 	r.Static("/public", "./public")
+
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"ginBoilerplateVersion": "v0.02",
+			"goVersion":             runtime.Version(),
+		})
+	})
+
+	r.NoRoute(func(c *gin.Context) {
+		c.HTML(404, "404.html", gin.H{})
+	})
 
 	r.Run(":9000")
 }
