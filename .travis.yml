@@ -25,6 +25,8 @@ before_install:
   - "psql -U postgres < ./db/database.sql"
   - sleep 3
 
+install:
+  - go get github.com/bmizerany/assert
+
 script:
- - go get github.com/bmizerany/assert
  - go test -v ./tests/*
