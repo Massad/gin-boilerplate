@@ -1,9 +1,14 @@
 language: go
 go:
- - 1.7.4
+  - 1.6
+  - 1.7.x
+  - master
 
 services:
   - redis-server
+  - postgresql
+
+dist: trusty
 
 addons:
   postgresql: "9.6"
@@ -15,8 +20,8 @@ addons:
     - gcc-4.8
     - clang
 before_install:
-  - "psql -U postgres -c 'create database golang_gin_db;'"
-  - "psql -U postgres golang_gin_db -c 'create extension postgis;'"
+  - "psql -c 'create database golang_gin_db;' -U postgres"
+  - "psql golang_gin_db -c 'create extension postgis;' -U postgres"
   - "psql -U postgres < ./db/database.sql"
   - sleep 3
 
