@@ -66,7 +66,7 @@ func main() {
 
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", gin.H{
-			"ginBoilerplateVersion": "v0.02",
+			"ginBoilerplateVersion": "v0.03",
 			"goVersion":             runtime.Version(),
 		})
 	})
