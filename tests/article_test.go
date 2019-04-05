@@ -208,7 +208,7 @@ func TestCreateArticle(t *testing.T) {
 
 	articleID = res.ID
 
-	assert.Equal(t, resp.Code, 200)
+	assert.Equal(t, resp.Code, 201)
 }
 
 /**
