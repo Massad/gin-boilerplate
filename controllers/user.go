@@ -40,7 +40,7 @@ func getSessionUserInfo(c *gin.Context) (userSessionInfo models.UserSessionInfo)
 func (ctrl UserController) Signin(c *gin.Context) {
 	var signinForm forms.SigninForm
 
-	if c.BindJSON(&signinForm) != nil {
+	if c.ShouldBindJSON(&signinForm) != nil {
 		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form", "form": signinForm})
 		c.Abort()
 		return
@@ -65,7 +65,7 @@ func (ctrl UserController) Signin(c *gin.Context) {
 func (ctrl UserController) Signup(c *gin.Context) {
 	var signupForm forms.SignupForm
 
-	if c.BindJSON(&signupForm) != nil {
+	if c.ShouldBindJSON(&signupForm) != nil {
 		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form", "form": signupForm})
 		c.Abort()
 		return

@@ -27,7 +27,7 @@ func (ctrl ArticleController) Create(c *gin.Context) {
 
 	var articleForm forms.ArticleForm
 
-	if c.BindJSON(&articleForm) != nil {
+	if c.ShouldBindJSON(&articleForm) != nil {
 		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form", "form": articleForm})
 		c.Abort()
 		return
@@ -106,7 +106,7 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 
 		var articleForm forms.ArticleForm
 
-		if c.BindJSON(&articleForm) != nil {
+		if c.ShouldBindJSON(&articleForm) != nil {
 			c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid parameters", "form": articleForm})
 			c.Abort()
 			return
