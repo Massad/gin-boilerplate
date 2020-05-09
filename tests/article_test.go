@@ -100,7 +100,7 @@ func TestSignup(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 200)
+	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
 /**
@@ -130,7 +130,7 @@ func TestSignupInvalidEmail(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 400) //406
+	assert.Equal(t, resp.Code, http.StatusNotAcceptable)
 }
 
 /**
@@ -163,7 +163,7 @@ func TestSignin(t *testing.T) {
 
 	signinCookie = resp.Header().Get("Set-Cookie")
 
-	assert.Equal(t, resp.Code, 200)
+	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
 /**
@@ -208,7 +208,7 @@ func TestCreateArticle(t *testing.T) {
 
 	articleID = res.ID
 
-	assert.Equal(t, resp.Code, 200)
+	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
 /**
@@ -237,14 +237,14 @@ func TestCreateInvalidArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 400) //406
+	assert.Equal(t, resp.Code, http.StatusNotAcceptable)
 }
 
 /**
 * TestCreateArticleNotSignedIn
 * Test article creation with a not signed in user
 *
-* Must return response code 403
+* Must return response code 401
  */
 func TestCreateArticleNotSignedIn(t *testing.T) {
 	testRouter := SetupRouter()
@@ -266,7 +266,7 @@ func TestCreateArticleNotSignedIn(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 403)
+	assert.Equal(t, resp.Code, http.StatusUnauthorized)
 }
 
 /**
@@ -290,7 +290,7 @@ func TestGetArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 200)
+	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
 /**
@@ -312,7 +312,7 @@ func TestGetInvalidArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 404)
+	assert.Equal(t, resp.Code, http.StatusNotFound)
 }
 
 /**
@@ -344,7 +344,7 @@ func TestUpdateArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 200)
+	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
 /**
@@ -368,7 +368,7 @@ func TestDeleteArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 200)
+	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
 /**
@@ -389,7 +389,7 @@ func TestUserSignout(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, 200)
+	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
 /**

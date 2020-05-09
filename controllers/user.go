@@ -4,6 +4,8 @@ import (
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/models"
 
+	"net/http"
+
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
@@ -39,8 +41,8 @@ func getSessionUserInfo(c *gin.Context) (userSessionInfo models.UserSessionInfo)
 func (ctrl UserController) Signin(c *gin.Context) {
 	var signinForm forms.SigninForm
 
-	if c.BindJSON(&signinForm) != nil {
-		c.JSON(406, gin.H{"message": "Invalid form", "form": signinForm})
+	if c.ShouldBindJSON(&signinForm) != nil {
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form", "form": signinForm})
 		c.Abort()
 		return
 	}
@@ -53,9 +55,9 @@ func (ctrl UserController) Signin(c *gin.Context) {
 		session.Set("user_name", user.Name)
 		session.Save()
 
-		c.JSON(200, gin.H{"message": "User signed in", "user": user})
+		c.JSON(http.StatusOK, gin.H{"message": "User signed in", "user": user})
 	} else {
-		c.JSON(406, gin.H{"message": "Invalid signin details", "error": err.Error()})
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid signin details", "error": err.Error()})
 	}
 
 }
@@ -64,8 +66,8 @@ func (ctrl UserController) Signin(c *gin.Context) {
 func (ctrl UserController) Signup(c *gin.Context) {
 	var signupForm forms.SignupForm
 
-	if c.BindJSON(&signupForm) != nil {
-		c.JSON(406, gin.H{"message": "Invalid form", "form": signupForm})
+	if c.ShouldBindJSON(&signupForm) != nil {
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form", "form": signupForm})
 		c.Abort()
 		return
 	}
@@ -73,7 +75,7 @@ func (ctrl UserController) Signup(c *gin.Context) {
 	user, err := userModel.Signup(signupForm)
 
 	if err != nil {
-		c.JSON(406, gin.H{"message": err.Error()})
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": err.Error()})
 		c.Abort()
 		return
 	}
@@ -84,9 +86,9 @@ func (ctrl UserController) Signup(c *gin.Context) {
 		session.Set("user_email", user.Email)
 		session.Set("user_name", user.Name)
 		session.Save()
-		c.JSON(200, gin.H{"message": "Success signup", "user": user})
+		c.JSON(http.StatusOK, gin.H{"message": "Success signup", "user": user})
 	} else {
-		c.JSON(406, gin.H{"message": "Could not signup this user", "error": err.Error()})
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Could not signup this user", "error": err.Error()})
 	}
 
 }
@@ -96,5 +98,5 @@ func (ctrl UserController) Signout(c *gin.Context) {
 	session := sessions.Default(c)
 	session.Clear()
 	session.Save()
-	c.JSON(200, gin.H{"message": "Signed out..."})
+	c.JSON(http.StatusOK, gin.H{"message": "Signed out..."})
 }
