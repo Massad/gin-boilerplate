@@ -100,7 +100,9 @@ $ go test -v ./tests/*
 
 ## Import Postman Collection (API's)
 
-You can import from this [link](https://www.getpostman.com/collections/ac0680f90961bafd5de7). If you don't have **Postman**, check this link [https://www.getpostman.com](https://www.getpostman.com/)
+Download [Postman](https://www.getpostman.com/) -> Import -> Import From Link
+
+https://www.postman.com/collections/7f941b400a88ddd9c137
 
 Includes the following:
 
@@ -117,7 +119,7 @@ Includes the following:
 - Auth
   - Refresh Token
 
-Tip: Add the generated `access_token` from the success login in the **global variable** for later use in other requests in the "**Tests**" tab in **Login** reqeust:
+> In Login request in Tests tab:
 
 ```
 pm.test("Status code is 200", function () {
@@ -130,11 +132,25 @@ pm.test("Status code is 200", function () {
 });
 ```
 
-And in each request that needs to be authenticated add the following **Authorization**:
+It captures the `access_token` from the success login in the **global variable** for later use in other requests.
+
+Also, you will find in each request that needs to be authenticated you will have the following:
 
     Authorization -> Bearer Token with value of {{token}}
 
-In this way, whenever you hit login from Postman it will automatically take the `access_token` and fills it in the golbal variable for later use. And of course, it will update it whenever you hit login again.
+It's very useful when you want to test the APIs in Postman without copying and pasting the tokens.
+
+## On You
+
+You will need to implement the `refresh_token` mechanism in your application (Frontend).
+
+> We have the `/v1/token/refresh` API here to use it.
+
+_For example:_
+
+If the API sends `401` Status Unauthorized, then you can send the `refresh_token` that you stored it before from the Login API in POST `/v1/token/refresh` to receive the new `access_token` & `refresh_token` and store them again. Now, if you receive an error in refreshing the token, that means the user will have to Login again as something went wrong.
+
+That's just an example, of course you can implement your own way.
 
 ## Version 1
 
@@ -152,7 +168,7 @@ If you have any question or need help, drop a message at [https://gitter.im/Mass
 
 ## Credit
 
-The implemented JWT inspired from this article: [Using JWT for Authentication in a Golang Application](https://www.nexmo.com/blog/2020/03/13/using-jwt-for-authentication-in-a-golang-application-dr) worth reading it, thanks [Victor Steven](https://www.nexmo.com/blog/author/victor-steven)
+The implemented JWT inspired from this article: [Using JWT for Authentication in a Golang Application](https://www.nexmo.com/blog/2020/03/13/using-jwt-for-authentication-in-a-golang-application-dr) worth reading it, thanks [Victor Steven](https://medium.com/@victorsteven)
 
 ---
 
