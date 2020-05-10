@@ -10,7 +10,7 @@ services:
   - redis-server
   - postgresql
 
-dist: bionic
+dist: trusty
 
 addons:
   postgresql: "9.6"
