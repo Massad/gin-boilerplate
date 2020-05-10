@@ -30,8 +30,6 @@ before_install:
   - sleep 3
 
 install:
-  - go mod init
-  - go list -m all
   - mv .env_rename_me .env
   - mkdir cert/ && sh generate-certificate.sh
 
