@@ -10,10 +10,10 @@ services:
   - redis-server
   - postgresql
 
-dist: trusty
+dist: bionic
 
 addons:
-  postgresql: "12"
+  postgresql: "9.6"
   apt:
     sources:
       - ubuntu-toolchain-r-test
@@ -21,9 +21,7 @@ addons:
       - g++-4.8
       - gcc-4.8
       - clang
-      - postgresql-12
-      - postgresql-client-12
-      - postgresql-server-dev-12
+      - postgresql-9.6-postgis-2.3
 
 before_install:
   - "psql -c 'create database golang_gin_db;' -U postgres"
