@@ -1,7 +1,9 @@
 language: go
 go:
-  - 1.10.x
   - 1.11.x
+  - 1.12.x
+  - 1.13.x
+  - 1.14.x
   - master
 
 services:
@@ -11,15 +13,17 @@ services:
 dist: trusty
 
 addons:
-  postgresql: "9.6"
+  postgresql: "12"
   apt:
     sources:
-    - ubuntu-toolchain-r-test
+      - ubuntu-toolchain-r-test
     packages:
-    - g++-4.8
-    - gcc-4.8
-    - clang
-    - postgresql-9.6-postgis-2.3
+      - g++-4.8
+      - gcc-4.8
+      - clang
+      - postgresql-12
+      - postgresql-client-12
+      - postgresql-server-dev-12
 
 before_install:
   - "psql -c 'create database golang_gin_db;' -U postgres"
@@ -28,8 +32,10 @@ before_install:
   - sleep 3
 
 install:
-  - go get -t -v ./...
-  - go get github.com/bmizerany/assert
+  - go mod init
+  - go list -m all
+  - mv .env_rename_me .env
+  - mkdir cert/ && sh generate-certificate.sh
 
 script:
- - go test -v ./tests/*
+  - go test -v ./tests/*

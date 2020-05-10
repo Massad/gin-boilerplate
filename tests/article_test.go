@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"io/ioutil"
 	"log"
@@ -16,9 +17,9 @@ import (
 	"github.com/Massad/gin-boilerplate/controllers"
 	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/joho/godotenv"
 
 	"github.com/bmizerany/assert"
-	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,17 +27,19 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 	gin.SetMode(gin.TestMode)
 
-	store, _ := sessions.NewRedisStore(10, "tcp", "localhost:6379", "", []byte("secret"))
-	r.Use(sessions.Sessions("gin-boilerplate-session", store))
-
 	v1 := r.Group("/v1")
 	{
 		/*** START USER ***/
 		user := new(controllers.UserController)
 
-		v1.POST("/user/signin", user.Signin)
-		v1.POST("/user/signup", user.Signup)
-		v1.GET("/user/signout", user.Signout)
+		v1.POST("/user/login", user.Login)
+		v1.POST("/user/register", user.Register)
+		v1.GET("/user/logout", user.Logout)
+
+		/*** START AUTH ***/
+		auth := new(controllers.AuthController)
+
+		v1.POST("/token/refresh", auth.Refresh)
 
 		/*** START Article ***/
 		article := new(controllers.ArticleController)
@@ -56,10 +59,13 @@ func main() {
 	r.Run()
 }
 
-var signinCookie string
+var loginCookie string
 
 var testEmail = "test-gin-boilerplate@test.com"
 var testPassword = "123456"
+
+var accessToken string
+var refreshToken string
 
 var articleID int
 
@@ -70,27 +76,37 @@ var articleID int
 * Must pass
  */
 func TestIntDB(t *testing.T) {
+
+	//Load the .env file
+	err := godotenv.Load("../.env")
+	if err != nil {
+		log.Fatal("Error loading .env file, please create one in the root directory")
+	}
+
+	fmt.Println("DB_PASS", os.Getenv("DB_PASS"))
+
 	db.Init()
+	db.InitRedis("1")
 }
 
 /**
-* TestSignup
+* TestRegister
 * Test user registration
 *
 * Must return response code 200
  */
-func TestSignup(t *testing.T) {
+func TestRegister(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var signupForm forms.SignupForm
+	var registerForm forms.RegisterForm
 
-	signupForm.Name = "testing"
-	signupForm.Email = testEmail
-	signupForm.Password = testPassword
+	registerForm.Name = "testing"
+	registerForm.Email = testEmail
+	registerForm.Password = testPassword
 
-	data, _ := json.Marshal(signupForm)
+	data, _ := json.Marshal(registerForm)
 
-	req, err := http.NewRequest("POST", "/v1/user/signup", bytes.NewBufferString(string(data)))
+	req, err := http.NewRequest("POST", "/v1/user/register", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
@@ -104,23 +120,23 @@ func TestSignup(t *testing.T) {
 }
 
 /**
-* TestSignupInvalidEmail
+* TestRegisterInvalidEmail
 * Test user registration with invalid email
 *
 * Must return response code 406
  */
-func TestSignupInvalidEmail(t *testing.T) {
+func TestRegisterInvalidEmail(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var signupForm forms.SignupForm
+	var registerForm forms.RegisterForm
 
-	signupForm.Name = "testing"
-	signupForm.Email = "invalid@email"
-	signupForm.Password = testPassword
+	registerForm.Name = "testing"
+	registerForm.Email = "invalid@email"
+	registerForm.Password = testPassword
 
-	data, _ := json.Marshal(signupForm)
+	data, _ := json.Marshal(registerForm)
 
-	req, err := http.NewRequest("POST", "/v1/user/signup", bytes.NewBufferString(string(data)))
+	req, err := http.NewRequest("POST", "/v1/user/register", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
@@ -134,23 +150,23 @@ func TestSignupInvalidEmail(t *testing.T) {
 }
 
 /**
-* TestSignin
-* Test user signin
-* and store the cookie on local variable [signinCookie]
+* TestLogin
+* Test user login
+* and get the access_token and refresh_token stored
 *
 * Must return response code 200
  */
-func TestSignin(t *testing.T) {
+func TestLogin(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var signinForm forms.SigninForm
+	var loginForm forms.LoginForm
 
-	signinForm.Email = testEmail
-	signinForm.Password = testPassword
+	loginForm.Email = testEmail
+	loginForm.Password = testPassword
 
-	data, _ := json.Marshal(signinForm)
+	data, _ := json.Marshal(loginForm)
 
-	req, err := http.NewRequest("POST", "/v1/user/signin", bytes.NewBufferString(string(data)))
+	req, err := http.NewRequest("POST", "/v1/user/login", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
@@ -161,9 +177,62 @@ func TestSignin(t *testing.T) {
 
 	testRouter.ServeHTTP(resp, req)
 
-	signinCookie = resp.Header().Get("Set-Cookie")
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var res = &struct {
+		Message string `json:"message"`
+		User    struct {
+			CreatedAt int64  `json:"created_at"`
+			Email     string `json:"email"`
+			ID        int64  `json:"id"`
+			Name      string `json:"name"`
+			UpdatedAt int64  `json:"updated_at"`
+		} `json:"user"`
+		Token struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+		} `json:"token"`
+	}{}
+
+	json.Unmarshal(body, &res)
+
+	accessToken = res.Token.AccessToken
+	refreshToken = res.Token.RefreshToken
 
 	assert.Equal(t, resp.Code, http.StatusOK)
+}
+
+/**
+* TestInvalidLogin
+* Test invalid login
+*
+* Must return response code 406
+ */
+func TestInvalidLogin(t *testing.T) {
+	testRouter := SetupRouter()
+
+	var loginForm forms.LoginForm
+
+	loginForm.Email = "wrong@email.com"
+	loginForm.Password = testPassword
+
+	data, _ := json.Marshal(loginForm)
+
+	req, err := http.NewRequest("POST", "/v1/user/login", bytes.NewBufferString(string(data)))
+	req.Header.Set("Content-Type", "application/json")
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	resp := httptest.NewRecorder()
+
+	testRouter.ServeHTTP(resp, req)
+
+	assert.Equal(t, resp.Code, http.StatusNotAcceptable)
 }
 
 /**
@@ -184,14 +253,13 @@ func TestCreateArticle(t *testing.T) {
 
 	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Cookie", signinCookie)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	resp := httptest.NewRecorder()
-
 	testRouter.ServeHTTP(resp, req)
 
 	body, err := ioutil.ReadAll(resp.Body)
@@ -228,45 +296,16 @@ func TestCreateInvalidArticle(t *testing.T) {
 
 	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Cookie", signinCookie)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	resp := httptest.NewRecorder()
-
 	testRouter.ServeHTTP(resp, req)
+
 	assert.Equal(t, resp.Code, http.StatusNotAcceptable)
-}
-
-/**
-* TestCreateArticleNotSignedIn
-* Test article creation with a not signed in user
-*
-* Must return response code 401
- */
-func TestCreateArticleNotSignedIn(t *testing.T) {
-	testRouter := SetupRouter()
-
-	var articleForm forms.ArticleForm
-
-	articleForm.Title = "Testing article title"
-	articleForm.Content = "Testing article content"
-
-	data, _ := json.Marshal(articleForm)
-
-	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resp := httptest.NewRecorder()
-
-	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, http.StatusUnauthorized)
 }
 
 /**
@@ -278,18 +317,16 @@ func TestCreateArticleNotSignedIn(t *testing.T) {
 func TestGetArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	url := fmt.Sprintf("/v1/article/%d", articleID)
-
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("Cookie", signinCookie)
+	req, err := http.NewRequest("GET", fmt.Sprintf("/v1/article/%d", articleID), nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	resp := httptest.NewRecorder()
-
 	testRouter.ServeHTTP(resp, req)
+
 	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
@@ -303,16 +340,61 @@ func TestGetInvalidArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
 	req, err := http.NewRequest("GET", "/v1/article/invalid", nil)
-	req.Header.Set("Cookie", signinCookie)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	resp := httptest.NewRecorder()
-
 	testRouter.ServeHTTP(resp, req)
+
 	assert.Equal(t, resp.Code, http.StatusNotFound)
+}
+
+/**
+* TestGetArticleNotLoggedin
+* Test getting the article with logged out user
+*
+* Must return response code 401
+ */
+func TestGetArticleNotLoggedin(t *testing.T) {
+	testRouter := SetupRouter()
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("/v1/article/%d", articleID), nil)
+	req.Header.Set("Content-Type", "application/json")
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	resp := httptest.NewRecorder()
+	testRouter.ServeHTTP(resp, req)
+
+	assert.Equal(t, resp.Code, http.StatusUnauthorized)
+}
+
+/**
+* TestCreateArticleUnauthorized
+* Test getting the article with unauthorized user (wrong or expired access_token)
+*
+* Must return response code 401
+ */
+func TestCreateArticleUnauthorized(t *testing.T) {
+	testRouter := SetupRouter()
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("/v1/article/%d", articleID), nil)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", "abc123"))
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	resp := httptest.NewRecorder()
+	testRouter.ServeHTTP(resp, req)
+
+	assert.Equal(t, resp.Code, http.StatusUnauthorized)
 }
 
 /**
@@ -335,15 +417,15 @@ func TestUpdateArticle(t *testing.T) {
 
 	req, err := http.NewRequest("PUT", url, bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Cookie", signinCookie)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	resp := httptest.NewRecorder()
-
 	testRouter.ServeHTTP(resp, req)
+
 	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
@@ -359,36 +441,94 @@ func TestDeleteArticle(t *testing.T) {
 	url := fmt.Sprintf("/v1/article/%d", articleID)
 
 	req, err := http.NewRequest("DELETE", url, nil)
-	req.Header.Set("Cookie", signinCookie)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	resp := httptest.NewRecorder()
-
 	testRouter.ServeHTTP(resp, req)
+
 	assert.Equal(t, resp.Code, http.StatusOK)
 }
 
 /**
-* TestUserSignout
-* Test signout a user
+* TestRefreshToken
+* Test refreshing the token with valid refresh_token
 *
 * Must return response code 200
  */
-func TestUserSignout(t *testing.T) {
+func TestRefreshToken(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", "/v1/user/signout", nil)
+	var tokenForm forms.Token
+
+	tokenForm.RefreshToken = refreshToken
+
+	data, _ := json.Marshal(tokenForm)
+
+	req, err := http.NewRequest("POST", "/v1/token/refresh", bytes.NewBufferString(string(data)))
+	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	resp := httptest.NewRecorder()
-
 	testRouter.ServeHTTP(resp, req)
+
+	assert.Equal(t, resp.Code, http.StatusOK)
+}
+
+/**
+* TestInvalidRefreshToken
+* Test refreshing the token with invalid refresh_token
+*
+* Must return response code 401
+ */
+func TestInvalidRefreshToken(t *testing.T) {
+	testRouter := SetupRouter()
+
+	var tokenForm forms.Token
+
+	//Since we didn't update it in the test before - this will not be valid anymore
+	tokenForm.RefreshToken = refreshToken
+
+	data, _ := json.Marshal(tokenForm)
+
+	req, err := http.NewRequest("POST", "/v1/token/refresh", bytes.NewBufferString(string(data)))
+	req.Header.Set("Content-Type", "application/json")
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	resp := httptest.NewRecorder()
+	testRouter.ServeHTTP(resp, req)
+
+	assert.Equal(t, resp.Code, http.StatusUnauthorized)
+}
+
+/**
+* TestUserSignout
+* Test logout a user
+*
+* Must return response code 200
+ */
+func TestUserLogout(t *testing.T) {
+	testRouter := SetupRouter()
+
+	req, err := http.NewRequest("GET", "/v1/user/logout", nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	resp := httptest.NewRecorder()
+	testRouter.ServeHTTP(resp, req)
+
 	assert.Equal(t, resp.Code, http.StatusOK)
 }
 

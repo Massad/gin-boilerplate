@@ -6,7 +6,6 @@ import (
 
 	"net/http"
 
-	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,63 +15,52 @@ type UserController struct{}
 var userModel = new(models.UserModel)
 
 //getUserID ...
-func getUserID(c *gin.Context) int64 {
-	session := sessions.Default(c)
-	userID := session.Get("user_id")
-	if userID != nil {
-		return models.ConvertToInt64(userID)
+func getUserID(c *gin.Context) (userID int64) {
+
+	tokenAuth, err := authModel.ExtractTokenMetadata(c.Request)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Please login first."})
+		return 0
 	}
-	return 0
+	userID, err = authModel.FetchAuth(tokenAuth)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Please login first."})
+		return 0
+	}
+
+	return userID
 }
 
-//getSessionUserInfo ...
-func getSessionUserInfo(c *gin.Context) (userSessionInfo models.UserSessionInfo) {
-	session := sessions.Default(c)
-	userID := session.Get("user_id")
-	if userID != nil {
-		userSessionInfo.ID = models.ConvertToInt64(userID)
-		userSessionInfo.Name = session.Get("user_name").(string)
-		userSessionInfo.Email = session.Get("user_email").(string)
-	}
-	return userSessionInfo
-}
+//Login ...
+func (ctrl UserController) Login(c *gin.Context) {
+	var loginForm forms.LoginForm
 
-//Signin ...
-func (ctrl UserController) Signin(c *gin.Context) {
-	var signinForm forms.SigninForm
-
-	if c.ShouldBindJSON(&signinForm) != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form", "form": signinForm})
+	if c.ShouldBindJSON(&loginForm) != nil {
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
 		c.Abort()
 		return
 	}
 
-	user, err := userModel.Signin(signinForm)
+	user, token, err := userModel.Login(loginForm)
 	if err == nil {
-		session := sessions.Default(c)
-		session.Set("user_id", user.ID)
-		session.Set("user_email", user.Email)
-		session.Set("user_name", user.Name)
-		session.Save()
-
-		c.JSON(http.StatusOK, gin.H{"message": "User signed in", "user": user})
+		c.JSON(http.StatusOK, gin.H{"message": "User signed in", "user": user, "token": token})
 	} else {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid signin details", "error": err.Error()})
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid login details", "error": err.Error()})
 	}
 
 }
 
-//Signup ...
-func (ctrl UserController) Signup(c *gin.Context) {
-	var signupForm forms.SignupForm
+//Register ...
+func (ctrl UserController) Register(c *gin.Context) {
+	var registerForm forms.RegisterForm
 
-	if c.ShouldBindJSON(&signupForm) != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form", "form": signupForm})
+	if c.ShouldBindJSON(&registerForm) != nil {
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
 		c.Abort()
 		return
 	}
 
-	user, err := userModel.Signup(signupForm)
+	user, err := userModel.Register(registerForm)
 
 	if err != nil {
 		c.JSON(http.StatusNotAcceptable, gin.H{"message": err.Error()})
@@ -81,22 +69,26 @@ func (ctrl UserController) Signup(c *gin.Context) {
 	}
 
 	if user.ID > 0 {
-		session := sessions.Default(c)
-		session.Set("user_id", user.ID)
-		session.Set("user_email", user.Email)
-		session.Set("user_name", user.Name)
-		session.Save()
-		c.JSON(http.StatusOK, gin.H{"message": "Success signup", "user": user})
+		c.JSON(http.StatusOK, gin.H{"message": "Successfully registered", "user": user})
 	} else {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Could not signup this user", "error": err.Error()})
+		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Could not register this user", "error": err.Error()})
 	}
 
 }
 
-//Signout ...
-func (ctrl UserController) Signout(c *gin.Context) {
-	session := sessions.Default(c)
-	session.Clear()
-	session.Save()
-	c.JSON(http.StatusOK, gin.H{"message": "Signed out..."})
+//Logout ...
+func (ctrl UserController) Logout(c *gin.Context) {
+
+	au, err := authModel.ExtractTokenMetadata(c.Request)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "User not logged in"})
+		return
+	}
+	deleted, delErr := authModel.DeleteAuth(au.AccessUUID)
+	if delErr != nil || deleted == 0 { //if any goes wrong
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid request"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
 }

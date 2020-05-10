@@ -2,7 +2,6 @@ package models
 
 import (
 	"errors"
-	"time"
 
 	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
@@ -24,24 +23,7 @@ type ArticleModel struct{}
 
 //Create ...
 func (m ArticleModel) Create(userID int64, form forms.ArticleForm) (articleID int64, err error) {
-	getDb := db.GetDB()
-
-	userModel := new(UserModel)
-
-	checkUser, err := userModel.One(userID)
-
-	if err != nil && checkUser.ID > 0 {
-		return 0, errors.New("User doesn't exist")
-	}
-
-	_, err = getDb.Exec("INSERT INTO public.article(user_id, title, content, updated_at, created_at) VALUES($1, $2, $3, $4, $5) RETURNING id", userID, form.Title, form.Content, time.Now().Unix(), time.Now().Unix())
-
-	if err != nil {
-		return 0, err
-	}
-
-	articleID, err = getDb.SelectInt("SELECT id FROM public.article WHERE user_id=$1 ORDER BY id DESC LIMIT 1", userID)
-
+	err = db.GetDB().QueryRow("INSERT INTO public.article(user_id, title, content) VALUES($1, $2, $3) RETURNING id", userID, form.Title, form.Content).Scan(&articleID)
 	return articleID, err
 }
 
@@ -65,7 +47,7 @@ func (m ArticleModel) Update(userID int64, id int64, form forms.ArticleForm) (er
 		return errors.New("Article not found")
 	}
 
-	_, err = db.GetDB().Exec("UPDATE public.article SET title=$1, content=$2, updated_at=$3 WHERE id=$4", form.Title, form.Content, time.Now().Unix(), id)
+	_, err = db.GetDB().Exec("UPDATE public.article SET title=$2, content=$3 WHERE id=$1", id, form.Title, form.Content)
 
 	return err
 }

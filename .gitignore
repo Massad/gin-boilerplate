@@ -1,0 +1,16 @@
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+
+# Logs #
+######################
+*.log
+
+# SENSITVE DATA #
+.env
+cert/
+
+# BUILD #
+./gin-boilerplate

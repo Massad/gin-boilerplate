@@ -18,134 +18,114 @@ var articleModel = new(models.ArticleModel)
 
 //Create ...
 func (ctrl ArticleController) Create(c *gin.Context) {
-	userID := getUserID(c)
+	if userID := getUserID(c); userID != 0 {
+		var articleForm forms.ArticleForm
 
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Please login first"})
-		c.Abort()
-		return
+		if c.ShouldBindJSON(&articleForm) != nil {
+			c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
+			c.Abort()
+			return
+		}
+
+		articleID, err := articleModel.Create(userID, articleForm)
+
+		if articleID == 0 && err != nil {
+			c.JSON(http.StatusNotAcceptable, gin.H{"message": "Article could not be created", "error": err.Error()})
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Article created", "id": articleID})
 	}
-
-	var articleForm forms.ArticleForm
-
-	if c.ShouldBindJSON(&articleForm) != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form", "form": articleForm})
-		c.Abort()
-		return
-	}
-
-	articleID, err := articleModel.Create(userID, articleForm)
-
-	if articleID > 0 && err != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Article could not be created", "error": err.Error()})
-		c.Abort()
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Article created", "id": articleID})
 }
 
 //All ...
 func (ctrl ArticleController) All(c *gin.Context) {
-	userID := getUserID(c)
+	if userID := getUserID(c); userID != 0 {
 
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Please login first"})
-		c.Abort()
-		return
+		data, err := articleModel.All(userID)
+
+		if err != nil {
+			c.JSON(http.StatusNotAcceptable, gin.H{"Message": "Could not get articles", "error": err.Error()})
+			c.Abort()
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"data": data})
 	}
-
-	data, err := articleModel.All(userID)
-
-	if err != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{"Message": "Could not get the articles", "error": err.Error()})
-		c.Abort()
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"data": data})
 }
 
 //One ...
 func (ctrl ArticleController) One(c *gin.Context) {
-	userID := getUserID(c)
+	if userID := getUserID(c); userID != 0 {
 
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Please login first"})
-		c.Abort()
-		return
-	}
+		id := c.Param("id")
+		if id, err := strconv.ParseInt(id, 10, 64); err == nil {
 
-	id := c.Param("id")
+			data, err := articleModel.One(userID, id)
 
-	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"Message": "Article not found", "error": err.Error()})
+				c.Abort()
+				return
+			}
 
-		data, err := articleModel.One(userID, id)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"Message": "Article not found", "error": err.Error()})
-			c.Abort()
-			return
+			c.JSON(http.StatusOK, gin.H{"data": data})
+
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 		}
-		c.JSON(http.StatusOK, gin.H{"data": data})
-	} else {
-		c.JSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 	}
 }
 
 //Update ...
 func (ctrl ArticleController) Update(c *gin.Context) {
-	userID := getUserID(c)
+	if userID := getUserID(c); userID != 0 {
 
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Please login first"})
-		c.Abort()
-		return
-	}
+		id := c.Param("id")
+		if id, err := strconv.ParseInt(id, 10, 64); err == nil {
 
-	id := c.Param("id")
-	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
+			var articleForm forms.ArticleForm
 
-		var articleForm forms.ArticleForm
+			if c.ShouldBindJSON(&articleForm) != nil {
+				c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
+				c.Abort()
+				return
+			}
 
-		if c.ShouldBindJSON(&articleForm) != nil {
-			c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid parameters", "form": articleForm})
-			c.Abort()
-			return
+			err := articleModel.Update(userID, id, articleForm)
+			if err != nil {
+				c.JSON(http.StatusNotAcceptable, gin.H{"Message": "Article could not be updated", "error": err.Error()})
+				c.Abort()
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"message": "Article updated"})
+
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter", "error": err.Error()})
 		}
-
-		err := articleModel.Update(userID, id, articleForm)
-		if err != nil {
-			c.JSON(http.StatusNotAcceptable, gin.H{"Message": "Article could not be updated", "error": err.Error()})
-			c.Abort()
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "Article updated"})
-	} else {
-		c.JSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter", "error": err.Error()})
 	}
 }
 
 //Delete ...
 func (ctrl ArticleController) Delete(c *gin.Context) {
-	userID := getUserID(c)
+	if userID := getUserID(c); userID != 0 {
 
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Please login first"})
-		c.Abort()
-		return
-	}
+		id := c.Param("id")
+		if id, err := strconv.ParseInt(id, 10, 64); err == nil {
 
-	id := c.Param("id")
-	if id, err := strconv.ParseInt(id, 10, 64); err == nil {
+			err := articleModel.Delete(userID, id)
+			if err != nil {
+				c.JSON(http.StatusNotAcceptable, gin.H{"Message": "Article could not be deleted", "error": err.Error()})
+				c.Abort()
+				return
+			}
 
-		err := articleModel.Delete(userID, id)
-		if err != nil {
-			c.JSON(http.StatusNotAcceptable, gin.H{"Message": "Article could not be deleted", "error": err.Error()})
-			c.Abort()
-			return
+			c.JSON(http.StatusOK, gin.H{"message": "Article deleted"})
+
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "Article deleted"})
-	} else {
-		c.JSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 	}
 }

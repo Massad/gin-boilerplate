@@ -3,17 +3,23 @@
 [![Build Status](https://travis-ci.org/Massad/gin-boilerplate.svg?branch=master)](https://travis-ci.org/Massad/gin-boilerplate)
 [![Join the chat at https://gitter.im/Massad/gin-boilerplate](https://badges.gitter.im/Massad/gin-boilerplate.svg)](https://gitter.im/Massad/gin-boilerplate?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-Welcome to **Golang Gin boilerplate**!
+Welcome to **Golang Gin boilerplate** v2
 
-The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic.github.io/gin/) with a structured project that defaults to **PostgreSQL** database and **Redis** as the session storage.
+The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic.github.io/gin/) with a structured project that defaults to **PostgreSQL** database and **JWT** authentication middleware stored in **Redis**
 
 ## Configured with
 
-* [go-gorp](https://github.com/go-gorp/gorp): Go Relational Persistence
-* [RedisStore](https://github.com/gin-gonic/contrib/tree/master/sessions): Gin middleware for session management with multi-backend support (currently cookie, Redis).
-* Built-in **CORS Middleware**
-* Feature **PostgreSQL 9.6** JSON queries
-* Unit test
+- [go-gorp](https://github.com/go-gorp/gorp): Go Relational Persistence
+- [jwt-go](github.com/dgrijalva/jwt-go): JSON Web Tokens (JWT) as middleware
+- [go-redis](https://github.com/go-redis/redis): Redis support for Go
+- Go Modules
+- Built-in **CORS Middleware**
+- Built-in **RequestID Middleware**
+- Feature **PostgreSQL 12** with JSON/JSONB queries & trigger functions
+- SSL Support
+- Enviroment support
+- Unit test
+- And few other important utilties to kickstart any project
 
 ### Installation
 
@@ -26,22 +32,51 @@ $ cd $GOPATH/src/github.com/Massad/gin-boilerplate
 ```
 
 ```
-$ go get -t -v ./...
+$ go mod init
 ```
 
-> Sometimes you need to get this package manually
 ```
-$ go get github.com/bmizerany/assert
+$ go list -m all
 ```
 
 You will find the **database.sql** in `db/database.sql`
 
 And you can import the postgres database using this command:
+
 ```
 $ psql -U postgres -h localhost < ./db/database.sql
 ```
 
+Tip:
+
+You will find that we added 2 trigger functions to the dabatase:
+
+- public.created_at_column()
+- public.update_at_column()
+
+Those are added to the `updated_at` and `created_at` columns to update the latest timestamp automatically in both **user** and **article** tables. You can explore the tables and public schema for more info.
+
 ## Running Your Application
+
+Rename .env_rename_me to .env and place your credentials
+
+```
+$ mv .env_rename_me .env
+```
+
+Generate SSL certificates (Optional)
+
+> If you don't SSL now, change `SSL=TRUE` to `SSL=FALSE` in the `.env` file
+
+```
+$ mkdir cert/
+```
+
+```
+$ sh generate-certificate.sh
+```
+
+> Make sure to change the values in .env for your databases
 
 ```
 $ go run *.go
@@ -63,9 +98,51 @@ $ ./gin-boilerplate
 $ go test -v ./tests/*
 ```
 
-
 ## Import Postman Collection (API's)
+
 You can import from this [link](https://www.getpostman.com/collections/ac0680f90961bafd5de7). If you don't have **Postman**, check this link [https://www.getpostman.com](https://www.getpostman.com/)
+
+Includes the following:
+
+- User
+  - Login
+  - Register
+  - Logout
+- Article
+  - Create
+  - Update
+  - Get Article
+  - Get Articles
+  - Delete
+- Auth
+  - Refresh Token
+
+Tip: Add the generated `access_token` from the success login in the **global variable** for later use in other requests in the "**Tests**" tab in **Login** reqeust:
+
+```
+pm.test("Status code is 200", function () {
+    pm.response.to.have.status(200);
+
+    var jsonData = JSON.parse(responseBody);
+    pm.globals.set("token", jsonData.token.access_token);
+    pm.globals.set("refresh_token", jsonData.token.refresh_token);
+
+});
+```
+
+And in each request that needs to be authenticated add the following **Authorization**:
+
+    Authorization -> Bearer Token with value of {{token}}
+
+In this way, whenever you hit login from Postman it will automatically take the `access_token` and fills it in the golbal variable for later use. And of course, it will update it whenever you hit login again.
+
+## Version 1
+
+    No longer supported
+
+You will find the last update on v1 in [v1-session-cookies-auth](https://github.com/Massad/gin-boilerplate/tree/v1-session-cookies-auth) branch or [v1.0.5 release](https://github.com/Massad/gin-boilerplate/releases/tag/1.05) that supported the authentication using the **session** and **cookies** stored in **Redis** if needed.
+
+- [RedisStore](https://github.com/gin-gonic/contrib/tree/master/sessions): Gin middleware for session management with multi-backend support (currently cookie, Redis).
 
 ## Contribution
 
@@ -73,9 +150,14 @@ You are welcome to contribute to keep it up to date and always improving!
 
 If you have any question or need help, drop a message at [https://gitter.im/Massad/gin-boilerplate](https://gitter.im/Massad/gin-boilerplate)
 
+## Credit
+
+The implemented JWT inspired from this article: [Using JWT for Authentication in a Golang Application](https://www.nexmo.com/blog/2020/03/13/using-jwt-for-authentication-in-a-golang-application-dr) worth reading it, thanks [Victor Steven](https://www.nexmo.com/blog/author/victor-steven)
+
 ---
 
 ## License
+
 (The MIT License)
 
 Permission is hereby granted, free of charge, to any person obtaining
