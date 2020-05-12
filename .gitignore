@@ -9,6 +9,7 @@
 *.log
 
 # SENSITVE DATA #
+.gitconfig
 .env
 cert/
 
