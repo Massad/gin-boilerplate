@@ -18,8 +18,8 @@ import (
 	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/assert"
 
-	"github.com/bmizerany/assert"
 	"github.com/gin-gonic/gin"
 )
 
