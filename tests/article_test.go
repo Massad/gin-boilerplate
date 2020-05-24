@@ -19,8 +19,8 @@ import (
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/joho/godotenv"
 
-	"github.com/bmizerany/assert"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 )
 
 func SetupRouter() *gin.Engine {
