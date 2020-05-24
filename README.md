@@ -39,7 +39,7 @@ $ go mod init
 ```
 
 ```
-$ go list -m all
+$ go install
 ```
 
 You will find the **database.sql** in `db/database.sql`
