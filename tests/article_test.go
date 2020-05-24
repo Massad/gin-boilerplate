@@ -375,12 +375,12 @@ func TestGetArticleNotLoggedin(t *testing.T) {
 }
 
 /**
-* TestCreateArticleUnauthorized
+* TestGetArticleUnauthorized
 * Test getting the article with unauthorized user (wrong or expired access_token)
 *
 * Must return response code 401
  */
-func TestCreateArticleUnauthorized(t *testing.T) {
+func TestGetArticleUnauthorized(t *testing.T) {
 	testRouter := SetupRouter()
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("/v1/article/%d", articleID), nil)
