@@ -16,19 +16,8 @@ var userModel = new(models.UserModel)
 
 //getUserID ...
 func getUserID(c *gin.Context) (userID int64) {
-
-	tokenAuth, err := authModel.ExtractTokenMetadata(c.Request)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Please login first."})
-		return 0
-	}
-	userID, err = authModel.FetchAuth(tokenAuth)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Please login first."})
-		return 0
-	}
-
-	return userID
+	//MustGet returns the value for the given key if it exists, otherwise it panics.
+	return c.MustGet("userID").(int64)
 }
 
 //Login ...
@@ -36,8 +25,7 @@ func (ctrl UserController) Login(c *gin.Context) {
 	var loginForm forms.LoginForm
 
 	if c.ShouldBindJSON(&loginForm) != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
 		return
 	}
 
@@ -55,16 +43,14 @@ func (ctrl UserController) Register(c *gin.Context) {
 	var registerForm forms.RegisterForm
 
 	if c.ShouldBindJSON(&registerForm) != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
 		return
 	}
 
 	user, err := userModel.Register(registerForm)
 
 	if err != nil {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": err.Error()})
-		c.Abort()
+		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": err.Error()})
 		return
 	}
 
@@ -81,12 +67,13 @@ func (ctrl UserController) Logout(c *gin.Context) {
 
 	au, err := authModel.ExtractTokenMetadata(c.Request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "User not logged in"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "User not logged in"})
 		return
 	}
+
 	deleted, delErr := authModel.DeleteAuth(au.AccessUUID)
 	if delErr != nil || deleted == 0 { //if any goes wrong
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid request"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Invalid request"})
 		return
 	}
 

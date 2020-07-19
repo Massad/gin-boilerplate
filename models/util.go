@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"reflect"
 )
 
 //UserSessionInfo ...
@@ -50,10 +49,8 @@ func (j *JSONRaw) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-//ConvertToInt64 ...
-func ConvertToInt64(number interface{}) int64 {
-	if reflect.TypeOf(number).String() == "int" {
-		return int64(number.(int))
-	}
-	return number.(int64)
+//DataList ....
+type DataList struct {
+	Data JSONRaw `db:"data" json:"data"`
+	Meta JSONRaw `db:"meta" json:"meta"`
 }

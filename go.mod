@@ -10,7 +10,9 @@ require (
 	github.com/go-redis/redis/v7 v7.3.0
 	github.com/joho/godotenv v1.3.0
 	github.com/lib/pq v1.5.2
+	github.com/myesui/uuid v1.0.0 // indirect
 	github.com/stretchr/testify v1.5.1 // indirect
 	github.com/twinj/uuid v1.0.0
 	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
+	gopkg.in/stretchr/testify.v1 v1.2.2 // indirect
 )

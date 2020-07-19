@@ -23,6 +23,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var auth = new(controllers.AuthController)
+
+//TokenAuthMiddleware ...
+//JWT Authentication middleware attached to each request that needs to be authenitcated to validate the access_token in the header
+func TokenAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		auth.TokenValid(c)
+		c.Next()
+	}
+}
+
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 	gin.SetMode(gin.TestMode)
@@ -44,11 +55,11 @@ func SetupRouter() *gin.Engine {
 		/*** START Article ***/
 		article := new(controllers.ArticleController)
 
-		v1.POST("/article", article.Create)
-		v1.GET("/articles", article.All)
-		v1.GET("/article/:id", article.One)
-		v1.PUT("/article/:id", article.Update)
-		v1.DELETE("/article/:id", article.Delete)
+		v1.POST("/article", TokenAuthMiddleware(), article.Create)
+		v1.GET("/articles", TokenAuthMiddleware(), article.All)
+		v1.GET("/article/:id", TokenAuthMiddleware(), article.One)
+		v1.PUT("/article/:id", TokenAuthMiddleware(), article.Update)
+		v1.DELETE("/article/:id", TokenAuthMiddleware(), article.Delete)
 	}
 
 	return r
