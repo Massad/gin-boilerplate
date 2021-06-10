@@ -92,7 +92,7 @@ func main() {
 		/*** START AUTH ***/
 		auth := new(controllers.AuthController)
 
-		//Rerfresh the token when needed to generate new access_token and refresh_token for the user
+		//Refresh the token when needed to generate new access_token and refresh_token for the user
 		v1.POST("/token/refresh", auth.Refresh)
 
 		/*** START Article ***/
