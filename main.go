@@ -58,6 +58,9 @@ func TokenAuthMiddleware() gin.HandlerFunc {
 }
 
 func main() {
+	if os.Getenv("ENV") == "PRODUCTION" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	//Start the default gin server
 	r := gin.Default()
@@ -122,10 +125,6 @@ func main() {
 
 	fmt.Println("SSL", os.Getenv("SSL"))
 	port := os.Getenv("PORT")
-
-	if os.Getenv("ENV") == "PRODUCTION" {
-		gin.SetMode(gin.ReleaseMode)
-	}
 
 	if os.Getenv("SSL") == "TRUE" {
 
