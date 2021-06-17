@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,6 +38,9 @@ func TokenAuthMiddleware() gin.HandlerFunc {
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 	gin.SetMode(gin.TestMode)
+
+	//Custom form validator
+	binding.Validator = new(forms.DefaultValidator)
 
 	v1 := r.Group("/v1")
 	{
@@ -97,7 +101,7 @@ func TestIntDB(t *testing.T) {
 	fmt.Println("DB_PASS", os.Getenv("DB_PASS"))
 
 	db.Init()
-	db.InitRedis("1")
+	db.InitRedis(1)
 }
 
 /**
@@ -255,12 +259,12 @@ func TestInvalidLogin(t *testing.T) {
 func TestCreateArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var articleForm forms.ArticleForm
+	var form forms.CreateAtricleForm
 
-	articleForm.Title = "Testing article title"
-	articleForm.Content = "Testing article content"
+	form.Title = "Testing article title"
+	form.Content = "Testing article content"
 
-	data, _ := json.Marshal(articleForm)
+	data, _ := json.Marshal(form)
 
 	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
@@ -299,11 +303,11 @@ func TestCreateArticle(t *testing.T) {
 func TestCreateInvalidArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var articleForm forms.ArticleForm
+	var form forms.CreateAtricleForm
 
-	articleForm.Title = "Testing article title"
+	form.Title = "Testing article title"
 
-	data, _ := json.Marshal(articleForm)
+	data, _ := json.Marshal(form)
 
 	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
 	req.Header.Set("Content-Type", "application/json")
@@ -417,12 +421,12 @@ func TestGetArticleUnauthorized(t *testing.T) {
 func TestUpdateArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var articleForm forms.ArticleForm
+	var form forms.CreateAtricleForm
 
-	articleForm.Title = "Testing new article title"
-	articleForm.Content = "Testing new article content"
+	form.Title = "Testing new article title"
+	form.Content = "Testing new article content"
 
-	data, _ := json.Marshal(articleForm)
+	data, _ := json.Marshal(form)
 
 	url := fmt.Sprintf("/v1/article/%d", articleID)
 

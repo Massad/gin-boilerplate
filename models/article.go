@@ -22,7 +22,7 @@ type Article struct {
 type ArticleModel struct{}
 
 //Create ...
-func (m ArticleModel) Create(userID int64, form forms.ArticleForm) (articleID int64, err error) {
+func (m ArticleModel) Create(userID int64, form forms.CreateAtricleForm) (articleID int64, err error) {
 	err = db.GetDB().QueryRow("INSERT INTO public.article(user_id, title, content) VALUES($1, $2, $3) RETURNING id", userID, form.Title, form.Content).Scan(&articleID)
 	return articleID, err
 }
@@ -40,27 +40,39 @@ func (m ArticleModel) All(userID int64) (articles []DataList, err error) {
 }
 
 //Update ...
-func (m ArticleModel) Update(userID int64, id int64, form forms.ArticleForm) (err error) {
-	_, err = m.One(userID, id)
+func (m ArticleModel) Update(userID int64, id int64, form forms.CreateAtricleForm) (err error) {
+	//METHOD 1
+	//Check the article by ID using this way
+	// _, err = m.One(userID, id)
+	// if err != nil {
+	// 	return err
+	// }
 
+	operation, err := db.GetDB().Exec("UPDATE public.article SET title=$2, content=$3 WHERE id=$1", id, form.Title, form.Content)
 	if err != nil {
-		return errors.New("Article not found")
+		return err
 	}
 
-	_, err = db.GetDB().Exec("UPDATE public.article SET title=$2, content=$3 WHERE id=$1", id, form.Title, form.Content)
+	success, _ := operation.RowsAffected()
+	if success == 0 {
+		return errors.New("updated 0 records")
+	}
 
 	return err
 }
 
 //Delete ...
 func (m ArticleModel) Delete(userID, id int64) (err error) {
-	_, err = m.One(userID, id)
 
+	operation, err := db.GetDB().Exec("DELETE FROM public.article WHERE id=$1", id)
 	if err != nil {
-		return errors.New("Article not found")
+		return err
 	}
 
-	_, err = db.GetDB().Exec("DELETE FROM public.article WHERE id=$1", id)
+	success, _ := operation.RowsAffected()
+	if success == 0 {
+		return errors.New("no records were deleted")
+	}
 
 	return err
 }

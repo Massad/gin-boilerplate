@@ -13,6 +13,7 @@ import (
 type UserController struct{}
 
 var userModel = new(models.UserModel)
+var userForm = new(forms.UserForm)
 
 //getUserID ...
 func getUserID(c *gin.Context) (userID int64) {
@@ -24,42 +25,38 @@ func getUserID(c *gin.Context) (userID int64) {
 func (ctrl UserController) Login(c *gin.Context) {
 	var loginForm forms.LoginForm
 
-	if c.ShouldBindJSON(&loginForm) != nil {
-		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
+	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
+		message := userForm.Login(validationErr)
+		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
 
 	user, token, err := userModel.Login(loginForm)
-	if err == nil {
-		c.JSON(http.StatusOK, gin.H{"message": "User signed in", "user": user, "token": token})
-	} else {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Invalid login details", "error": err.Error()})
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid login details"})
+		return
 	}
 
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged in", "user": user, "token": token})
 }
 
 //Register ...
 func (ctrl UserController) Register(c *gin.Context) {
 	var registerForm forms.RegisterForm
 
-	if c.ShouldBindJSON(&registerForm) != nil {
-		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid form"})
+	if validationErr := c.ShouldBindJSON(&registerForm); validationErr != nil {
+		message := userForm.Register(validationErr)
+		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
 
 	user, err := userModel.Register(registerForm)
-
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": err.Error()})
 		return
 	}
 
-	if user.ID > 0 {
-		c.JSON(http.StatusOK, gin.H{"message": "Successfully registered", "user": user})
-	} else {
-		c.JSON(http.StatusNotAcceptable, gin.H{"message": "Could not register this user", "error": err.Error()})
-	}
-
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully registered", "user": user})
 }
 
 //Logout ...

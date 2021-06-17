@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 
 	"github.com/go-gorp/gorp"
 	_redis "github.com/go-redis/redis/v7"
@@ -38,9 +37,11 @@ func ConnectDB(dataSourceName string) (*gorp.DbMap, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err = db.Ping(); err != nil {
 		return nil, err
 	}
+
 	dbmap := &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}
 	//dbmap.TraceOn("[gorp]", log.New(os.Stdout, "golang-gin:", log.Lmicroseconds)) //Trace database requests
 	return dbmap, nil
@@ -55,18 +56,27 @@ func GetDB() *gorp.DbMap {
 var RedisClient *_redis.Client
 
 //InitRedis ...
-func InitRedis(params ...string) {
+func InitRedis(selectDB ...int) {
 
 	var redisHost = os.Getenv("REDIS_HOST")
 	var redisPassword = os.Getenv("REDIS_PASSWORD")
 
-	db, _ := strconv.Atoi(params[0])
-
 	RedisClient = _redis.NewClient(&_redis.Options{
 		Addr:     redisHost,
 		Password: redisPassword,
-		DB:       db,
+		DB:       selectDB[0],
+		// DialTimeout:        10 * time.Second,
+		// ReadTimeout:        30 * time.Second,
+		// WriteTimeout:       30 * time.Second,
+		// PoolSize:           10,
+		// PoolTimeout:        30 * time.Second,
+		// IdleTimeout:        500 * time.Millisecond,
+		// IdleCheckFrequency: 500 * time.Millisecond,
+		// TLSConfig: &tls.Config{
+		// 	InsecureSkipVerify: true,
+		// },
 	})
+
 }
 
 //GetRedis ...

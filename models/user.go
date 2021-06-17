@@ -40,11 +40,14 @@ func (m UserModel) Login(form forms.LoginForm) (user User, token Token, err erro
 	err = bcrypt.CompareHashAndPassword(byteHashedPassword, bytePassword)
 
 	if err != nil {
-		return user, token, errors.New("Invalid password")
+		return user, token, err
 	}
 
 	//Generate the JWT auth token
 	tokenDetails, err := authModel.CreateToken(user.ID)
+	if err != nil {
+		return user, token, err
+	}
 
 	saveErr := authModel.CreateAuth(user.ID, tokenDetails)
 	if saveErr == nil {
@@ -61,23 +64,25 @@ func (m UserModel) Register(form forms.RegisterForm) (user User, err error) {
 
 	//Check if the user exists in database
 	checkUser, err := getDb.SelectInt("SELECT count(id) FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
-
 	if err != nil {
-		return user, err
+		return user, errors.New("something went wrong, please try again later")
 	}
 
 	if checkUser > 0 {
-		return user, errors.New("User already exists")
+		return user, errors.New("email already exists")
 	}
 
 	bytePassword := []byte(form.Password)
 	hashedPassword, err := bcrypt.GenerateFromPassword(bytePassword, bcrypt.DefaultCost)
 	if err != nil {
-		panic(err) //Something really went wrong here...
+		return user, errors.New("something went wrong, please try again later")
 	}
 
 	//Create the user and return back the user ID
 	err = getDb.QueryRow("INSERT INTO public.user(email, password, name) VALUES($1, $2, $3) RETURNING id", form.Email, string(hashedPassword), form.Name).Scan(&user.ID)
+	if err != nil {
+		return user, errors.New("something went wrong, please try again later")
+	}
 
 	user.Name = form.Name
 	user.Email = form.Email
@@ -87,6 +92,6 @@ func (m UserModel) Register(form forms.RegisterForm) (user User, err error) {
 
 //One ...
 func (m UserModel) One(userID int64) (user User, err error) {
-	err = db.GetDB().SelectOne(&user, "SELECT id, email, name FROM public.user WHERE id=$1", userID)
+	err = db.GetDB().SelectOne(&user, "SELECT id, email, name FROM public.user WHERE id=$1 LIMIT 1", userID)
 	return user, err
 }
