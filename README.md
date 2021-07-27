@@ -16,7 +16,7 @@ The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic
 - [jwt-go](https://github.com/golang-jwt/jwt): JSON Web Tokens (JWT) as middleware
 - [go-redis](https://github.com/go-redis/redis): Redis support for Go
 - Go Modules
-- Built-in custom validators
+- Built-in **Custom Validators**
 - Built-in **CORS Middleware**
 - Built-in **RequestID Middleware**
 - Feature **PostgreSQL 12** with JSON/JSONB queries & trigger functions
