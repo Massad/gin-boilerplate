@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Massad/gin-boilerplate/db"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	uuid "github.com/twinj/uuid"
 )
 
