@@ -22,7 +22,7 @@ type Article struct {
 type ArticleModel struct{}
 
 //Create ...
-func (m ArticleModel) Create(userID int64, form forms.CreateAtricleForm) (articleID int64, err error) {
+func (m ArticleModel) Create(userID int64, form forms.CreateArticleForm) (articleID int64, err error) {
 	err = db.GetDB().QueryRow("INSERT INTO public.article(user_id, title, content) VALUES($1, $2, $3) RETURNING id", userID, form.Title, form.Content).Scan(&articleID)
 	return articleID, err
 }
@@ -40,7 +40,7 @@ func (m ArticleModel) All(userID int64) (articles []DataList, err error) {
 }
 
 //Update ...
-func (m ArticleModel) Update(userID int64, id int64, form forms.CreateAtricleForm) (err error) {
+func (m ArticleModel) Update(userID int64, id int64, form forms.CreateArticleForm) (err error) {
 	//METHOD 1
 	//Check the article by ID using this way
 	// _, err = m.One(userID, id)
