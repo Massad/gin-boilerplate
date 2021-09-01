@@ -259,7 +259,7 @@ func TestInvalidLogin(t *testing.T) {
 func TestCreateArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var form forms.CreateAtricleForm
+	var form forms.CreateArticleForm
 
 	form.Title = "Testing article title"
 	form.Content = "Testing article content"
@@ -303,7 +303,7 @@ func TestCreateArticle(t *testing.T) {
 func TestCreateInvalidArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var form forms.CreateAtricleForm
+	var form forms.CreateArticleForm
 
 	form.Title = "Testing article title"
 
@@ -421,7 +421,7 @@ func TestGetArticleUnauthorized(t *testing.T) {
 func TestUpdateArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var form forms.CreateAtricleForm
+	var form forms.CreateArticleForm
 
 	form.Title = "Testing new article title"
 	form.Content = "Testing new article content"
