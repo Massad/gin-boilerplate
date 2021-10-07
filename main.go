@@ -60,14 +60,14 @@ func TokenAuthMiddleware() gin.HandlerFunc {
 }
 
 func main() {
-	if os.Getenv("ENV") == "PRODUCTION" {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
 	//Load the .env file
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("error: failed to load the env file")
+	}
+
+	if os.Getenv("ENV") == "PRODUCTION" {
+		gin.SetMode(gin.ReleaseMode)
 	}
 
 	//Start the default gin server
@@ -134,14 +134,14 @@ func main() {
 
 	if os.Getenv("SSL") == "TRUE" {
 
+		//Generated using sh generate-certificate.sh
 		SSLKeys := &struct {
 			CERT string
 			KEY  string
-		}{}
-
-		//Generated using sh generate-certificate.sh
-		SSLKeys.CERT = "./cert/myCA.cer"
-		SSLKeys.KEY = "./cert/myCA.key"
+		}{
+			CERT: "./cert/myCA.cer",
+			KEY:  "./cert/myCA.key",
+		}
 
 		r.RunTLS(":"+port, SSLKeys.CERT, SSLKeys.KEY)
 	} else {
