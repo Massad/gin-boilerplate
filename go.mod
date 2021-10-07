@@ -9,7 +9,7 @@ require (
 	github.com/go-playground/validator/v10 v10.8.0
 	github.com/go-redis/redis/v7 v7.3.0
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
-	github.com/golang-jwt/jwt v3.2.1+incompatible
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/joho/godotenv v1.3.0
 	github.com/json-iterator/go v1.1.11 // indirect
