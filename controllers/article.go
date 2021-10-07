@@ -21,7 +21,7 @@ var articleForm = new(forms.ArticleForm)
 func (ctrl ArticleController) Create(c *gin.Context) {
 	userID := getUserID(c)
 
-	var form forms.CreateAtricleForm
+	var form forms.CreateArticleForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
 		message := articleForm.Create(validationErr)
@@ -84,7 +84,7 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 		return
 	}
 
-	var form forms.CreateAtricleForm
+	var form forms.CreateArticleForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
 		message := articleForm.Create(validationErr)
