@@ -197,7 +197,7 @@ func TestLogin(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	var res = &struct {
+	var res struct {
 		Message string `json:"message"`
 		User    struct {
 			CreatedAt int64  `json:"created_at"`
@@ -210,8 +210,7 @@ func TestLogin(t *testing.T) {
 			AccessToken  string `json:"access_token"`
 			RefreshToken string `json:"refresh_token"`
 		} `json:"token"`
-	}{}
-
+	}
 	json.Unmarshal(body, &res)
 
 	accessToken = res.Token.AccessToken
@@ -282,11 +281,10 @@ func TestCreateArticle(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	res := struct {
+	var res struct {
 		Status int
 		ID     int
-	}{}
-
+	}
 	json.Unmarshal(body, &res)
 
 	articleID = res.ID
