@@ -1,3 +1,4 @@
+//go:build all
 // +build all
 
 package tests
@@ -131,7 +132,7 @@ func TestRegister(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -161,7 +162,7 @@ func TestRegisterInvalidEmail(t *testing.T) {
 	resp := httptest.NewRecorder()
 
 	testRouter.ServeHTTP(resp, req)
-	assert.Equal(t, resp.Code, http.StatusNotAcceptable)
+	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -216,7 +217,7 @@ func TestLogin(t *testing.T) {
 	accessToken = res.Token.AccessToken
 	refreshToken = res.Token.RefreshToken
 
-	assert.Equal(t, resp.Code, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -246,7 +247,7 @@ func TestInvalidLogin(t *testing.T) {
 
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusNotAcceptable)
+	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -289,7 +290,7 @@ func TestCreateArticle(t *testing.T) {
 
 	articleID = res.ID
 
-	assert.Equal(t, resp.Code, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -318,7 +319,7 @@ func TestCreateInvalidArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusNotAcceptable)
+	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -340,7 +341,7 @@ func TestGetArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -362,7 +363,7 @@ func TestGetInvalidArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusNotFound)
+	assert.Equal(t, http.StatusNotFound, resp.Code)
 }
 
 /**
@@ -384,7 +385,7 @@ func TestGetArticleNotLoggedin(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusUnauthorized)
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -407,7 +408,7 @@ func TestGetArticleUnauthorized(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusUnauthorized)
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -439,7 +440,7 @@ func TestUpdateArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -463,7 +464,7 @@ func TestDeleteArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -491,7 +492,7 @@ func TestRefreshToken(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -520,7 +521,7 @@ func TestInvalidRefreshToken(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusUnauthorized)
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -542,7 +543,7 @@ func TestUserLogout(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	assert.Equal(t, resp.Code, http.StatusOK)
+	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
