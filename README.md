@@ -8,7 +8,7 @@
 
 Welcome to **Golang Gin boilerplate** v2
 
-The fastest way to deploy a restful api's with [Gin Framework](https://gin-gonic.github.io/gin/) with a structured project that defaults to **PostgreSQL** database and **JWT** authentication middleware stored in **Redis**
+The fastest way to deploy a restful api's with [Gin Framework](https://github.com/gin-gonic/gin/) with a structured project that defaults to **PostgreSQL** database and **JWT** authentication middleware stored in **Redis**
 
 ## Configured with
 
