@@ -11,8 +11,8 @@ import (
 	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/gin-contrib/gzip"
+	uuid "github.com/google/uuid"
 	"github.com/joho/godotenv"
-	uuid "github.com/twinj/uuid"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -42,7 +42,7 @@ func CORSMiddleware() gin.HandlerFunc {
 //Generate a unique ID and attach it to each request for future reference or use
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uuid := uuid.NewV4()
+		uuid := uuid.New()
 		c.Writer.Header().Set("X-Request-Id", uuid.String())
 		c.Next()
 	}
