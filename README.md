@@ -21,7 +21,7 @@ The fastest way to deploy a restful api's with [Gin Framework](https://github.co
 - Built-in **RequestID Middleware**
 - Feature **PostgreSQL 12** with JSON/JSONB queries & trigger functions
 - SSL Support
-- Enviroment support
+- Environment support
 - Unit test
 - And few other important utilties to kickstart any project
 
