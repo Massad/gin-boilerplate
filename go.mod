@@ -22,7 +22,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.8 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
 	github.com/poy/onpar v1.1.2 // indirect
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	golang.org/x/arch v0.7.0 // indirect
@@ -30,7 +30,4 @@ require (
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
-	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
-	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
