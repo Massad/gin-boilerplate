@@ -1,0 +1,371 @@
+basePath: /v1
+definitions:
+  forms.ArticleResponse:
+    properties:
+      id:
+        type: integer
+      message:
+        type: string
+    type: object
+  forms.CreateArticleForm:
+    properties:
+      content:
+        maxLength: 1000
+        minLength: 3
+        type: string
+      title:
+        maxLength: 100
+        minLength: 3
+        type: string
+    required:
+    - content
+    - title
+    type: object
+  forms.LoginForm:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  forms.RegisterForm:
+    properties:
+      email:
+        type: string
+      name:
+        description: fullName rule is in validator.go
+        maxLength: 20
+        minLength: 3
+        type: string
+      password:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  forms.Token:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  models.AllArticleResponse:
+    properties:
+      results:
+        items:
+          $ref: '#/definitions/models.Result'
+        type: array
+    type: object
+  models.ArticleResponse:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: integer
+      id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: integer
+      user:
+        $ref: '#/definitions/models.UserResponse'
+    type: object
+  models.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  models.MessageResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  models.Meta:
+    properties:
+      total:
+        type: integer
+    type: object
+  models.OneArticleResponse:
+    properties:
+      data:
+        $ref: '#/definitions/models.ArticleResponse'
+    type: object
+  models.Result:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.ArticleResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/models.Meta'
+    type: object
+  models.User:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  models.UserLoginResponse:
+    properties:
+      message:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+    type: object
+  models.UserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+externalDocs:
+  description: OpenAPI
+  url: https://swagger.io/resources/open-api/
+host: localhost:9000
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a sample server celler server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Golang GIN Boilerplate
+  version: "1.0"
+paths:
+  /article:
+    post:
+      consumes:
+      - application/json
+      description: Create Article example
+      parameters:
+      - description: Article
+        in: body
+        name: article
+        required: true
+        schema:
+          $ref: '#/definitions/forms.CreateArticleForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/forms.ArticleResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/forms.ArticleResponse'
+      summary: Create Article example
+      tags:
+      - Article
+  /article/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete Article example
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.OneArticleResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/forms.ArticleResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/forms.ArticleResponse'
+      summary: Delete Article example
+      tags:
+      - Article
+    get:
+      consumes:
+      - application/json
+      description: One All Article example
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.OneArticleResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/forms.ArticleResponse'
+      summary: Get One Article example
+      tags:
+      - Article
+    put:
+      consumes:
+      - application/json
+      description: Update Article example
+      parameters:
+      - description: Article
+        in: body
+        name: article
+        required: true
+        schema:
+          $ref: '#/definitions/forms.CreateArticleForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ArticleResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/forms.ArticleResponse'
+      summary: Update Article example
+      tags:
+      - Article
+  /articles:
+    get:
+      consumes:
+      - application/json
+      description: Get All Articles example
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AllArticleResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/forms.ArticleResponse'
+      summary: Get All Articles example
+      tags:
+      - Article
+  /token/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh Token example
+      parameters:
+      - description: Auth
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/forms.Token'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AuthResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Refresh Token example
+      tags:
+      - Auth
+  /user/login:
+    post:
+      consumes:
+      - application/json
+      description: Login User example
+      parameters:
+      - description: User
+        in: body
+        name: article
+        required: true
+        schema:
+          $ref: '#/definitions/forms.LoginForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserLoginResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Login User example
+      tags:
+      - User
+  /user/logout:
+    get:
+      consumes:
+      - application/json
+      description: Logout User example
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Logout User example
+      tags:
+      - User
+  /user/register:
+    post:
+      consumes:
+      - application/json
+      description: Register User example
+      parameters:
+      - description: User
+        in: body
+        name: article
+        required: true
+        schema:
+          $ref: '#/definitions/forms.RegisterForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserLoginResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Register User example
+      tags:
+      - User
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

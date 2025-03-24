@@ -9,17 +9,19 @@ import (
 
 	"github.com/Massad/gin-boilerplate/controllers"
 	"github.com/Massad/gin-boilerplate/db"
+	_ "github.com/Massad/gin-boilerplate/docs"
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/gin-contrib/gzip"
-	uuid "github.com/google/uuid"
-	"github.com/joho/godotenv"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
+	uuid "github.com/google/uuid"
+	"github.com/joho/godotenv"
+	swaggerfiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger" // gin-swagger middleware
 )
 
-//CORSMiddleware ...
-//CORS (Cross-Origin Resource Sharing)
+// CORSMiddleware ...
+// CORS (Cross-Origin Resource Sharing)
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost")
@@ -38,8 +40,8 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
-//RequestIDMiddleware ...
-//Generate a unique ID and attach it to each request for future reference or use
+// RequestIDMiddleware ...
+// Generate a unique ID and attach it to each request for future reference or use
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uuid := uuid.New()
@@ -50,8 +52,8 @@ func RequestIDMiddleware() gin.HandlerFunc {
 
 var auth = new(controllers.AuthController)
 
-//TokenAuthMiddleware ...
-//JWT Authentication middleware attached to each request that needs to be authenitcated to validate the access_token in the header
+// TokenAuthMiddleware ...
+// JWT Authentication middleware attached to each request that needs to be authenitcated to validate the access_token in the header
 func TokenAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth.TokenValid(c)
@@ -59,6 +61,27 @@ func TokenAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+// @title           Golang GIN Boilerplate
+// @version         1.0
+// @description     This is a sample server celler server.
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    http://www.swagger.io/support
+// @contact.email  support@swagger.io
+
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host      localhost:9000
+// @BasePath  /v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
+// @externalDocs.description  OpenAPI
+// @externalDocs.url          https://swagger.io/resources/open-api/
 func main() {
 	//Load the .env file
 	err := godotenv.Load(".env")
@@ -112,6 +135,9 @@ func main() {
 		v1.PUT("/article/:id", TokenAuthMiddleware(), article.Update)
 		v1.DELETE("/article/:id", TokenAuthMiddleware(), article.Delete)
 	}
+
+	// Swagger docs
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 
 	r.LoadHTMLGlob("./public/html/*")
 

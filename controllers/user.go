@@ -9,19 +9,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//UserController ...
+// UserController ...
 type UserController struct{}
 
 var userModel = new(models.UserModel)
 var userForm = new(forms.UserForm)
 
-//getUserID ...
+// getUserID ...
 func getUserID(c *gin.Context) (userID int64) {
 	//MustGet returns the value for the given key if it exists, otherwise it panics.
 	return c.MustGet("userID").(int64)
 }
 
-//Login ...
+// Login User godoc
+// @Summary Login User example
+// @Schemes
+// @Description Login User example
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param article body forms.LoginForm true "User"
+// @Success 	 200  {object}  models.UserLoginResponse
+// @Failure      406  {object}  models.MessageResponse
+// @Router /user/login [post]
 func (ctrl UserController) Login(c *gin.Context) {
 	var loginForm forms.LoginForm
 
@@ -40,7 +50,17 @@ func (ctrl UserController) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged in", "user": user, "token": token})
 }
 
-//Register ...
+// Register User godoc
+// @Summary Register User example
+// @Schemes
+// @Description Register User example
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param article body forms.RegisterForm true "User"
+// @Success 	 200  {object}  models.UserLoginResponse
+// @Failure      406  {object}  models.MessageResponse
+// @Router /user/register [post]
 func (ctrl UserController) Register(c *gin.Context) {
 	var registerForm forms.RegisterForm
 
@@ -59,7 +79,16 @@ func (ctrl UserController) Register(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully registered", "user": user})
 }
 
-//Logout ...
+// Logout User godoc
+// @Summary Logout User example
+// @Schemes
+// @Description Logout User example
+// @Tags User
+// @Accept json
+// @Produce json
+// @Success 	 200  {object}  models.MessageResponse
+// @Failure      406  {object}  models.MessageResponse
+// @Router /user/logout [GET]
 func (ctrl UserController) Logout(c *gin.Context) {
 
 	au, err := authModel.ExtractTokenMetadata(c.Request)
