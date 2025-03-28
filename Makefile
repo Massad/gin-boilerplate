@@ -1,5 +1,5 @@
 ## RUN APPLICATION
-run: 
+run:
 	@echo -e "🚀 Running the application..."
 	@go run *.go
 
@@ -9,7 +9,7 @@ test:
 	@go test -v ./tests/*
 
 ## INSTALL SWAG CLI TOOL & PACKAGES
-install_swag: 
+install_swag:
 	@echo -e "📥 Installing Swag CLI and dependencies..."
 	@which swag >/dev/null 2>&1 || (echo -e "❌ Swag CLI not found! Installing now..." && go install github.com/swaggo/swag/cmd/swag@latest)
 	@echo -e "🔄 Updating project dependencies for Swag..."
@@ -18,7 +18,7 @@ install_swag:
 	@echo -e "✅ Swag installation complete!"
 
 ## GENERATE API DOCUMENTATION
-generate_docs: install_swag 
+generate_docs: install_swag
 	@echo -e "📜 Generating API documentation using Swag..."
 	@swag init
 	@echo -e "✅ API documentation generated successfully!"

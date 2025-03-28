@@ -1,8 +1,8 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "This is a sample server celler server.",
-        "title": "Golang GIN Boilerplate",
+        "description": "A RESTful API boilerplate with Gin Framework, PostgreSQL, Redis and JWT authentication",
+        "title": "Golang Gin Boilerplate",
         "termsOfService": "http://swagger.io/terms/",
         "contact": {
             "name": "API Support",
@@ -10,8 +10,8 @@
             "email": "support@swagger.io"
         },
         "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+            "name": "MIT License",
+            "url": "https://github.com/Massad/gin-boilerplate/blob/master/LICENSE"
         },
         "version": "1.0"
     },

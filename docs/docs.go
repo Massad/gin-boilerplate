@@ -17,8 +17,8 @@ const docTemplate = `{
             "email": "support@swagger.io"
         },
         "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+            "name": "MIT License",
+            "url": "https://github.com/Massad/gin-boilerplate/blob/master/LICENSE"
         },
         "version": "{{.Version}}"
     },
@@ -572,12 +572,10 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:9000",
 	BasePath:         "/v1",
 	Schemes:          []string{},
-	Title:            "Golang GIN Boilerplate",
-	Description:      "This is a sample server celler server.",
+	Title:            "Golang Gin Boilerplate",
+	Description:      "A RESTful API boilerplate with Gin Framework, PostgreSQL, Redis and JWT authentication",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
-	// LeftDelim:        "{{",
-	// RightDelim:       "}}",
 }
 
 func init() {

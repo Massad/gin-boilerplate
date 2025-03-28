@@ -61,17 +61,17 @@ func TokenAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// @title           Golang GIN Boilerplate
+// @title           Golang Gin Boilerplate
 // @version         1.0
-// @description     This is a sample server celler server.
+// @description     A RESTful API boilerplate with Gin Framework, PostgreSQL, Redis and JWT authentication
 // @termsOfService  http://swagger.io/terms/
 
 // @contact.name   API Support
 // @contact.url    http://www.swagger.io/support
 // @contact.email  support@swagger.io
 
-// @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+// @license.name  MIT License
+// @license.url   https://github.com/Massad/gin-boilerplate/blob/master/LICENSE
 
 // @host      localhost:9000
 // @BasePath  /v1

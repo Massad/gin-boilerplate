@@ -147,12 +147,13 @@ info:
     email: support@swagger.io
     name: API Support
     url: http://www.swagger.io/support
-  description: This is a sample server celler server.
+  description: A RESTful API boilerplate with Gin Framework, PostgreSQL, Redis and
+    JWT authentication
   license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
+    name: MIT License
+    url: https://github.com/Massad/gin-boilerplate/blob/master/LICENSE
   termsOfService: http://swagger.io/terms/
-  title: Golang GIN Boilerplate
+  title: Golang Gin Boilerplate
   version: "1.0"
 paths:
   /article:
