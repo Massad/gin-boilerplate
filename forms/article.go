@@ -6,16 +6,20 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-//ArticleForm ...
+// ArticleForm ...
 type ArticleForm struct{}
 
-//CreateArticleForm ...
 type CreateArticleForm struct {
 	Title   string `form:"title" json:"title" binding:"required,min=3,max=100"`
 	Content string `form:"content" json:"content" binding:"required,min=3,max=1000"`
 }
 
-//Title ...
+type ArticleResponse struct {
+	ID      int64  `json:"id"`
+	Message string `json:"message"`
+}
+
+// Title ...
 func (f ArticleForm) Title(tag string, errMsg ...string) (message string) {
 	switch tag {
 	case "required":
@@ -30,7 +34,7 @@ func (f ArticleForm) Title(tag string, errMsg ...string) (message string) {
 	}
 }
 
-//Content ...
+// Content ...
 func (f ArticleForm) Content(tag string, errMsg ...string) (message string) {
 	switch tag {
 	case "required":
@@ -45,7 +49,7 @@ func (f ArticleForm) Content(tag string, errMsg ...string) (message string) {
 	}
 }
 
-//Create ...
+// Create ...
 func (f ArticleForm) Create(err error) string {
 	switch err.(type) {
 	case validator.ValidationErrors:
@@ -70,7 +74,7 @@ func (f ArticleForm) Create(err error) string {
 	return "Something went wrong, please try again later"
 }
 
-//Update ...
+// Update ...
 func (f ArticleForm) Update(err error) string {
 	switch err.(type) {
 	case validator.ValidationErrors:

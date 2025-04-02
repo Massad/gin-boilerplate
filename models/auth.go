@@ -13,7 +13,12 @@ import (
 	uuid "github.com/google/uuid"
 )
 
-//TokenDetails ...
+type AuthResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+// TokenDetails ...
 type TokenDetails struct {
 	AccessToken  string
 	RefreshToken string
@@ -23,22 +28,22 @@ type TokenDetails struct {
 	RtExpires    int64
 }
 
-//AccessDetails ...
+// AccessDetails ...
 type AccessDetails struct {
 	AccessUUID string
 	UserID     int64
 }
 
-//Token ...
+// Token ...
 type Token struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
 
-//AuthModel ...
+// AuthModel ...
 type AuthModel struct{}
 
-//CreateToken ...
+// CreateToken ...
 func (m AuthModel) CreateToken(userID int64) (*TokenDetails, error) {
 
 	td := &TokenDetails{}
@@ -74,7 +79,7 @@ func (m AuthModel) CreateToken(userID int64) (*TokenDetails, error) {
 	return td, nil
 }
 
-//CreateAuth ...
+// CreateAuth ...
 func (m AuthModel) CreateAuth(userid int64, td *TokenDetails) error {
 	at := time.Unix(td.AtExpires, 0) //converting Unix to UTC(to Time object)
 	rt := time.Unix(td.RtExpires, 0)
@@ -91,7 +96,7 @@ func (m AuthModel) CreateAuth(userid int64, td *TokenDetails) error {
 	return nil
 }
 
-//ExtractToken ...
+// ExtractToken ...
 func (m AuthModel) ExtractToken(r *http.Request) string {
 	bearToken := r.Header.Get("Authorization")
 	//normally Authorization the_token_xxx
@@ -102,7 +107,7 @@ func (m AuthModel) ExtractToken(r *http.Request) string {
 	return ""
 }
 
-//VerifyToken ...
+// VerifyToken ...
 func (m AuthModel) VerifyToken(r *http.Request) (*jwt.Token, error) {
 	tokenString := m.ExtractToken(r)
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -118,7 +123,7 @@ func (m AuthModel) VerifyToken(r *http.Request) (*jwt.Token, error) {
 	return token, nil
 }
 
-//TokenValid ...
+// TokenValid ...
 func (m AuthModel) TokenValid(r *http.Request) error {
 	token, err := m.VerifyToken(r)
 	if err != nil {
@@ -130,7 +135,7 @@ func (m AuthModel) TokenValid(r *http.Request) error {
 	return nil
 }
 
-//ExtractTokenMetadata ...
+// ExtractTokenMetadata ...
 func (m AuthModel) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
 	token, err := m.VerifyToken(r)
 	if err != nil {
@@ -154,7 +159,7 @@ func (m AuthModel) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error)
 	return nil, err
 }
 
-//FetchAuth ...
+// FetchAuth ...
 func (m AuthModel) FetchAuth(authD *AccessDetails) (int64, error) {
 	userid, err := db.GetRedis().Get(authD.AccessUUID).Result()
 	if err != nil {
@@ -164,7 +169,7 @@ func (m AuthModel) FetchAuth(authD *AccessDetails) (int64, error) {
 	return userID, nil
 }
 
-//DeleteAuth ...
+// DeleteAuth ...
 func (m AuthModel) DeleteAuth(givenUUID string) (int64, error) {
 	deleted, err := db.GetRedis().Del(givenUUID).Result()
 	if err != nil {

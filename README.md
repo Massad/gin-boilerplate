@@ -86,6 +86,20 @@ $ sh generate-certificate.sh
 $ go run *.go
 ```
 
+## Generate Swagger API Docs
+
+```
+$ make generate_docs
+```
+
+```
+$ make run
+```
+
+```
+$ open https://localhost:9000/swagger/index.html
+```
+
 ## Building Your Application
 
 ```

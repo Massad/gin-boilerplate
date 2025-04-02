@@ -9,7 +9,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-//User ...
+type UserLoginResponse struct {
+	User    User   `json:"user"`
+	Token   string `json:"token"`
+	Message string `json:"message"`
+}
+
+type MessageResponse struct {
+	Message string `json:"message"`
+}
+
+// User ...
 type User struct {
 	ID        int64  `db:"id, primarykey, autoincrement" json:"id"`
 	Email     string `db:"email" json:"email"`
@@ -19,12 +29,12 @@ type User struct {
 	CreatedAt int64  `db:"created_at" json:"-"`
 }
 
-//UserModel ...
+// UserModel ...
 type UserModel struct{}
 
 var authModel = new(AuthModel)
 
-//Login ...
+// Login ...
 func (m UserModel) Login(form forms.LoginForm) (user User, token Token, err error) {
 
 	err = db.GetDB().SelectOne(&user, "SELECT id, email, password, name, updated_at, created_at FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
@@ -58,7 +68,7 @@ func (m UserModel) Login(form forms.LoginForm) (user User, token Token, err erro
 	return user, token, nil
 }
 
-//Register ...
+// Register ...
 func (m UserModel) Register(form forms.RegisterForm) (user User, err error) {
 	getDb := db.GetDB()
 
@@ -90,7 +100,7 @@ func (m UserModel) Register(form forms.RegisterForm) (user User, err error) {
 	return user, err
 }
 
-//One ...
+// One ...
 func (m UserModel) One(userID int64) (user User, err error) {
 	err = db.GetDB().SelectOne(&user, "SELECT id, email, name FROM public.user WHERE id=$1 LIMIT 1", userID)
 	return user, err
