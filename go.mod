@@ -6,7 +6,7 @@ toolchain go1.24.1
 
 require (
 	github.com/gin-contrib/gzip v1.2.2
-	github.com/gin-gonic/gin v1.10.0
+	github.com/gin-gonic/gin v1.10.1
 	github.com/go-gorp/gorp v2.2.0+incompatible
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/go-redis/redis/v7 v7.4.1
