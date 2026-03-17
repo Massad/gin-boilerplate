@@ -1,85 +1,66 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
 
-	"github.com/go-gorp/gorp"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 	_redis "github.com/go-redis/redis/v7"
-	_ "github.com/lib/pq" //import postgres
 )
 
-//DB ...
-type DB struct {
-	*sql.DB
-}
+var dbConn *sqlx.DB
 
-var db *gorp.DbMap
-
-//Init ...
+// Init connects to PostgreSQL using environment variables.
 func Init() {
+	sslMode := "disable"
+	if os.Getenv("SSL") == "TRUE" {
+		sslMode = "require"
+	}
 
-	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", os.Getenv("DB_USER"), os.Getenv("DB_PASS"), os.Getenv("DB_NAME"))
+	dbinfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASS"),
+		os.Getenv("DB_NAME"),
+		sslMode,
+	)
 
 	var err error
-	db, err = ConnectDB(dbinfo)
+	dbConn, err = sqlx.Connect("postgres", dbinfo)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 }
 
-//ConnectDB ...
-func ConnectDB(dataSourceName string) (*gorp.DbMap, error) {
-	db, err := sql.Open("postgres", dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = db.Ping(); err != nil {
-		return nil, err
-	}
-
-	dbmap := &gorp.DbMap{Db: db, Dialect: gorp.PostgresDialect{}}
-	//dbmap.TraceOn("[gorp]", log.New(os.Stdout, "golang-gin:", log.Lmicroseconds)) //Trace database requests
-	return dbmap, nil
+// GetDB returns the sqlx database connection.
+func GetDB() *sqlx.DB {
+	return dbConn
 }
 
-//GetDB ...
-func GetDB() *gorp.DbMap {
-	return db
-}
-
-//RedisClient ...
+// RedisClient holds the Redis connection.
 var RedisClient *_redis.Client
 
-//InitRedis ...
+// InitRedis connects to Redis.
 func InitRedis(selectDB ...int) {
-
 	var redisHost = os.Getenv("REDIS_HOST")
 	var redisPassword = os.Getenv("REDIS_PASSWORD")
+
+	redisDB := 0
+	if len(selectDB) > 0 {
+		redisDB = selectDB[0]
+	}
 
 	RedisClient = _redis.NewClient(&_redis.Options{
 		Addr:     redisHost,
 		Password: redisPassword,
-		DB:       selectDB[0],
-		// DialTimeout:        10 * time.Second,
-		// ReadTimeout:        30 * time.Second,
-		// WriteTimeout:       30 * time.Second,
-		// PoolSize:           10,
-		// PoolTimeout:        30 * time.Second,
-		// IdleTimeout:        500 * time.Millisecond,
-		// IdleCheckFrequency: 500 * time.Millisecond,
-		// TLSConfig: &tls.Config{
-		// 	InsecureSkipVerify: true,
-		// },
+		DB:       redisDB,
 	})
-
 }
 
-//GetRedis ...
+// GetRedis returns the Redis client.
 func GetRedis() *_redis.Client {
 	return RedisClient
 }

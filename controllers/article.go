@@ -15,7 +15,6 @@ import (
 type ArticleController struct{}
 
 var articleModel = new(models.ArticleModel)
-var articleForm = new(forms.ArticleForm)
 
 // Create Article godoc
 // @Summary Create Article example
@@ -34,7 +33,7 @@ func (ctrl ArticleController) Create(c *gin.Context) {
 	var form forms.CreateArticleForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
-		message := articleForm.Create(validationErr)
+		message := forms.Translate(validationErr, forms.ArticleMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
@@ -125,7 +124,7 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 	var form forms.CreateArticleForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
-		message := articleForm.Create(validationErr)
+		message := forms.Translate(validationErr, forms.ArticleMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
@@ -168,5 +167,4 @@ func (ctrl ArticleController) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Article deleted"})
-
 }

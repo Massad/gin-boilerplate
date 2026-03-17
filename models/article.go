@@ -46,7 +46,7 @@ type Meta struct {
 
 // Article ...
 type Article struct {
-	ID        int64    `db:"id, primarykey, autoincrement" json:"id"`
+	ID        int64    `db:"id" json:"id"`
 	UserID    int64    `db:"user_id" json:"-"`
 	Title     string   `db:"title" json:"title"`
 	Content   string   `db:"content" json:"content"`
@@ -66,13 +66,13 @@ func (m ArticleModel) Create(userID int64, form forms.CreateArticleForm) (articl
 
 // One ...
 func (m ArticleModel) One(userID, id int64) (article Article, err error) {
-	err = db.GetDB().SelectOne(&article, "SELECT a.id, a.title, a.content, a.updated_at, a.created_at, json_build_object('id', u.id, 'name', u.name, 'email', u.email) AS user FROM public.article a LEFT JOIN public.user u ON a.user_id = u.id WHERE a.user_id=$1 AND a.id=$2 LIMIT 1", userID, id)
+	err = db.GetDB().Get(&article, "SELECT a.id, a.title, a.content, a.updated_at, a.created_at, json_build_object('id', u.id, 'name', u.name, 'email', u.email) AS user FROM public.article a LEFT JOIN public.user u ON a.user_id = u.id WHERE a.user_id=$1 AND a.id=$2 LIMIT 1", userID, id)
 	return article, err
 }
 
 // All ...
 func (m ArticleModel) All(userID int64) (articles []DataList, err error) {
-	_, err = db.GetDB().Select(&articles, "SELECT COALESCE(array_to_json(array_agg(row_to_json(d))), '[]') AS data, (SELECT row_to_json(n) FROM ( SELECT count(a.id) AS total FROM public.article AS a WHERE a.user_id=$1 LIMIT 1 ) n ) AS meta FROM ( SELECT a.id, a.title, a.content, a.updated_at, a.created_at, json_build_object('id', u.id, 'name', u.name, 'email', u.email) AS user FROM public.article a LEFT JOIN public.user u ON a.user_id = u.id WHERE a.user_id=$1 ORDER BY a.id DESC) d", userID)
+	err = db.GetDB().Select(&articles, "SELECT COALESCE(array_to_json(array_agg(row_to_json(d))), '[]') AS data, (SELECT row_to_json(n) FROM ( SELECT count(a.id) AS total FROM public.article AS a WHERE a.user_id=$1 LIMIT 1 ) n ) AS meta FROM ( SELECT a.id, a.title, a.content, a.updated_at, a.created_at, json_build_object('id', u.id, 'name', u.name, 'email', u.email) AS user FROM public.article a LEFT JOIN public.user u ON a.user_id = u.id WHERE a.user_id=$1 ORDER BY a.id DESC) d", userID)
 	return articles, err
 }
 
@@ -85,7 +85,7 @@ func (m ArticleModel) Update(userID int64, id int64, form forms.CreateArticleFor
 	// 	return err
 	// }
 
-	operation, err := db.GetDB().Exec("UPDATE public.article SET title=$2, content=$3 WHERE id=$1", id, form.Title, form.Content)
+	operation, err := db.GetDB().Exec("UPDATE public.article SET title=$3, content=$4 WHERE id=$1 AND user_id=$2", id, userID, form.Title, form.Content)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (m ArticleModel) Update(userID int64, id int64, form forms.CreateArticleFor
 // Delete ...
 func (m ArticleModel) Delete(userID, id int64) (err error) {
 
-	operation, err := db.GetDB().Exec("DELETE FROM public.article WHERE id=$1", id)
+	operation, err := db.GetDB().Exec("DELETE FROM public.article WHERE id=$1 AND user_id=$2", id, userID)
 	if err != nil {
 		return err
 	}

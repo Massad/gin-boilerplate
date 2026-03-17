@@ -11,7 +11,7 @@ import (
 
 type UserLoginResponse struct {
 	User    User   `json:"user"`
-	Token   string `json:"token"`
+	Token   Token  `json:"token"`
 	Message string `json:"message"`
 }
 
@@ -21,7 +21,7 @@ type MessageResponse struct {
 
 // User ...
 type User struct {
-	ID        int64  `db:"id, primarykey, autoincrement" json:"id"`
+	ID        int64  `db:"id" json:"id"`
 	Email     string `db:"email" json:"email"`
 	Password  string `db:"password" json:"-"`
 	Name      string `db:"name" json:"name"`
@@ -37,7 +37,7 @@ var authModel = new(AuthModel)
 // Login ...
 func (m UserModel) Login(form forms.LoginForm) (user User, token Token, err error) {
 
-	err = db.GetDB().SelectOne(&user, "SELECT id, email, password, name, updated_at, created_at FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
+	err = db.GetDB().Get(&user, "SELECT id, email, password, name, updated_at, created_at FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
 
 	if err != nil {
 		return user, token, err
@@ -59,11 +59,12 @@ func (m UserModel) Login(form forms.LoginForm) (user User, token Token, err erro
 		return user, token, err
 	}
 
-	saveErr := authModel.CreateAuth(user.ID, tokenDetails)
-	if saveErr == nil {
-		token.AccessToken = tokenDetails.AccessToken
-		token.RefreshToken = tokenDetails.RefreshToken
+	if err = authModel.CreateAuth(user.ID, tokenDetails); err != nil {
+		return user, token, err
 	}
+
+	token.AccessToken = tokenDetails.AccessToken
+	token.RefreshToken = tokenDetails.RefreshToken
 
 	return user, token, nil
 }
@@ -73,7 +74,8 @@ func (m UserModel) Register(form forms.RegisterForm) (user User, err error) {
 	getDb := db.GetDB()
 
 	//Check if the user exists in database
-	checkUser, err := getDb.SelectInt("SELECT count(id) FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
+	var checkUser int64
+	err = getDb.Get(&checkUser, "SELECT count(id) FROM public.user WHERE email=LOWER($1) LIMIT 1", form.Email)
 	if err != nil {
 		return user, errors.New("something went wrong, please try again later")
 	}
@@ -102,6 +104,6 @@ func (m UserModel) Register(form forms.RegisterForm) (user User, err error) {
 
 // One ...
 func (m UserModel) One(userID int64) (user User, err error) {
-	err = db.GetDB().SelectOne(&user, "SELECT id, email, name FROM public.user WHERE id=$1 LIMIT 1", userID)
+	err = db.GetDB().Get(&user, "SELECT id, email, name FROM public.user WHERE id=$1 LIMIT 1", userID)
 	return user, err
 }

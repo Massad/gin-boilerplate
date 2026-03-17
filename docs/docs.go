@@ -194,6 +194,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/invoice": {
+            "get": {
+                "description": "Returns an HTML preview of a sample invoice",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Preview Invoice as HTML",
+                "responses": {
+                    "200": {
+                        "description": "HTML page",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/invoice/download": {
+            "get": {
+                "description": "Generates and downloads a sample invoice as PDF",
+                "produces": [
+                    "application/pdf"
+                ],
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Download Invoice as PDF",
+                "responses": {
+                    "200": {
+                        "description": "PDF file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "500": {
+                        "description": "Error generating PDF",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                }
+            }
+        },
         "/token/refresh": {
             "post": {
                 "description": "Refresh Token example",
@@ -404,7 +450,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "name": {
-                    "description": "fullName rule is in validator.go",
                     "type": "string",
                     "maxLength": 20,
                     "minLength": 3
@@ -510,6 +555,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.Token": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "models.User": {
             "type": "object",
             "properties": {
@@ -531,7 +587,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "token": {
-                    "type": "string"
+                    "$ref": "#/definitions/models.Token"
                 },
                 "user": {
                     "$ref": "#/definitions/models.User"
@@ -568,7 +624,7 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "3.0",
 	Host:             "localhost:9000",
 	BasePath:         "/v1",
 	Schemes:          []string{},

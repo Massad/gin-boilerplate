@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice {{ .invoice.Number }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+        .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+        .company-name { font-size: 24px; font-weight: bold; }
+        .invoice-meta { display: flex; justify-content: space-between; margin: 20px 0; }
+        .invoice-meta div { flex: 1; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f5f5f5; font-weight: bold; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .total-row { font-size: 18px; font-weight: bold; }
+        .download-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #333; color: #fff; text-decoration: none; border-radius: 4px; }
+        .download-link:hover { background: #555; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ .invoice.Company.Name }}</div>
+        <div>{{ .invoice.Company.Address }}</div>
+        <div>{{ .invoice.Company.Email }}</div>
+    </div>
+
+    <div class="invoice-meta">
+        <div>
+            <strong>Invoice:</strong> {{ .invoice.Number }}<br>
+            <strong>Bill To:</strong> {{ .invoice.Client.Name }}<br>
+            {{ .invoice.Client.Address }}
+        </div>
+        <div class="text-right">
+            <strong>Date:</strong> {{ .invoice.Date }}<br>
+            <strong>Due:</strong> {{ .invoice.DueDate }}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th class="text-center">Qty</th>
+                <th class="text-right">Unit Price</th>
+                <th class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ range .items }}
+            <tr>
+                <td>{{ .Description }}</td>
+                <td class="text-center">{{ .Quantity }}</td>
+                <td class="text-right">${{ .UnitPrice }}</td>
+                <td class="text-right">${{ .LineTotal }}</td>
+            </tr>
+            {{ end }}
+        </tbody>
+    </table>
+
+    <div class="text-right total-row">
+        Total: ${{ .total }}
+    </div>
+
+    <a href="/v1/invoice/download" class="download-link">Download PDF</a>
+</body>
+</html>

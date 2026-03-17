@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -123,18 +124,6 @@ func (m AuthModel) VerifyToken(r *http.Request) (*jwt.Token, error) {
 	return token, nil
 }
 
-// TokenValid ...
-func (m AuthModel) TokenValid(r *http.Request) error {
-	token, err := m.VerifyToken(r)
-	if err != nil {
-		return err
-	}
-	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
-		return err
-	}
-	return nil
-}
-
 // ExtractTokenMetadata ...
 func (m AuthModel) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
 	token, err := m.VerifyToken(r)
@@ -142,21 +131,24 @@ func (m AuthModel) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error)
 		return nil, err
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
-	if ok && token.Valid {
-		accessUUID, ok := claims["access_uuid"].(string)
-		if !ok {
-			return nil, err
-		}
-		userID, err := strconv.ParseInt(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		return &AccessDetails{
-			AccessUUID: accessUUID,
-			UserID:     userID,
-		}, nil
+	if !ok || !token.Valid {
+		return nil, errors.New("invalid token claims")
 	}
-	return nil, err
+
+	accessUUID, ok := claims["access_uuid"].(string)
+	if !ok {
+		return nil, errors.New("invalid access_uuid claim")
+	}
+
+	userID, err := strconv.ParseInt(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AccessDetails{
+		AccessUUID: accessUUID,
+		UserID:     userID,
+	}, nil
 }
 
 // FetchAuth ...

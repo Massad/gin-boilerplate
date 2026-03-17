@@ -2,213 +2,195 @@
 
 [![License](https://img.shields.io/github/license/Massad/gin-boilerplate)](https://github.com/Massad/gin-boilerplate/blob/master/LICENSE) [![GitHub release (latest by date)](https://img.shields.io/github/v/release/Massad/gin-boilerplate)](https://github.com/Massad/gin-boilerplate/releases) [![Go Version](https://img.shields.io/github/go-mod/go-version/Massad/gin-boilerplate)](https://github.com/Massad/gin-boilerplate/blob/master/go.mod) [![DB Version](https://img.shields.io/badge/DB-PostgreSQL--latest-blue)](https://github.com/Massad/gin-boilerplate/blob/master/go.mod) [![DB Version](https://img.shields.io/badge/DB-Redis--latest-blue)](https://github.com/Massad/gin-boilerplate/blob/master/go.mod)
 
-[![Build Status](https://travis-ci.org/Massad/gin-boilerplate.svg?branch=master)](https://travis-ci.org/Massad/gin-boilerplate) [![Go Report Card](https://goreportcard.com/badge/github.com/Massad/gin-boilerplate)](https://goreportcard.com/report/github.com/Massad/gin-boilerplate)
+# Golang Gin Boilerplate v3
 
-[![Join the chat at https://gitter.im/Massad/gin-boilerplate](https://badges.gitter.im/Massad/gin-boilerplate.svg)](https://gitter.im/Massad/gin-boilerplate?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/gin-gonic/gin/) — structured with **PostgreSQL**, **JWT** authentication stored in **Redis**, and ready to build on.
 
-Welcome to **Golang Gin boilerplate** v2
+## What's Included
 
-The fastest way to deploy a restful api's with [Gin Framework](https://github.com/gin-gonic/gin/) with a structured project that defaults to **PostgreSQL** database and **JWT** authentication middleware stored in **Redis**
-
-## Configured with
-
-- [go-gorp](https://github.com/go-gorp/gorp): Go Relational Persistence
-- [jwt-go](https://github.com/golang-jwt/jwt): JSON Web Tokens (JWT) as middleware
-- [go-redis](https://github.com/go-redis/redis): Redis support for Go
+- [sqlx](https://github.com/jmoiron/sqlx): Lightweight SQL extensions for Go
+- [jwt-go](https://github.com/golang-jwt/jwt): JSON Web Tokens (JWT) middleware
+- [go-redis](https://github.com/go-redis/redis): Redis client
+- [maroto](https://github.com/johnfercher/maroto): Pure Go PDF generation
+- Built-in **CORS**, **RequestID**, and **Auth** middleware
+- Built-in **custom form validators** with reusable error translation
+- **Invoice example** — HTML preview and PDF download
+- **Swagger API documentation**
+- PostgreSQL with JSON/JSONB queries and trigger functions
+- SSL support
 - Go Modules
-- Built-in **Custom Validators**
-- Built-in **CORS Middleware**
-- Built-in **RequestID Middleware**
-- Feature **PostgreSQL 12** with JSON/JSONB queries & trigger functions
-- SSL Support
-- Environment support
-- Unit test
-- And few other important utilties to kickstart any project
 
-### Installation
+## Getting Started
 
-```
-$ go get github.com/Massad/gin-boilerplate
-```
+### Prerequisites
 
-```
-$ cd $GOPATH/src/github.com/Massad/gin-boilerplate
-```
+- Go 1.24+
+- PostgreSQL
+- Redis
 
-```
-$ go mod init
+### Setup
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Massad/gin-boilerplate.git
+cd gin-boilerplate
 ```
 
-```
-$ go install
-```
+Install dependencies:
 
-You will find the **database.sql** in `db/database.sql`
-
-And you can import the postgres database using this command:
-
-```
-$ psql -U postgres -h localhost < ./db/database.sql
+```bash
+go mod download
 ```
 
-Tip:
+Set up your environment:
 
-You will find that we added 2 trigger functions to the dabatase:
-
-- `public.created_at_column()`
-- `public.update_at_column()`
-
-Those are added to the `updated_at` and `created_at` columns to update the latest timestamp automatically in both **user** and **article** tables. You can explore the tables and public schema for more info.
-
-## Running Your Application
-
-Rename .env_rename_me to .env and place your credentials
-
-```
-$ mv .env_rename_me .env
+```bash
+cp .env_rename_me .env
+# Edit .env with your database credentials
 ```
 
-Generate SSL certificates (Optional)
+Import the database schema:
 
-> If you don't SSL now, change `SSL=TRUE` to `SSL=FALSE` in the `.env` file
-
-```
-$ mkdir cert/
+```bash
+psql -U postgres -h localhost < ./db/database.sql
 ```
 
-```
-$ sh generate-certificate.sh
-```
+The database includes trigger functions (`created_at_column()` and `update_at_column()`) that automatically manage `created_at` and `updated_at` timestamps on the **user** and **article** tables.
 
-> Make sure to change the values in .env for your databases
+### Running
 
-```
-$ go run *.go
+```bash
+make run
 ```
 
-## Generate Swagger API Docs
+Or directly:
 
-```
-$ make generate_docs
-```
-
-```
-$ make run
+```bash
+go run *.go
 ```
 
-```
-$ open https://localhost:9000/swagger/index.html
-```
+### Building
 
-## Building Your Application
-
-```
-$ go build -v
+```bash
+go build -v
+./gin-boilerplate
 ```
 
-```
-$ ./gin-boilerplate
-```
+### Testing
 
-## Testing Your Application
+Tests are integration tests that require running PostgreSQL and Redis:
 
-```
-$ go test -v ./tests/*
+```bash
+go test -v -tags=all ./tests/*
 ```
 
-## Import Postman Collection (API's)
+### SSL (Optional)
 
-Download [Postman](https://www.getpostman.com/) -> Import -> Import From Link
+To enable SSL, set `SSL=TRUE` in `.env` and generate certificates:
 
-https://www.postman.com/collections/7f941b400a88ddd9c137
-
-Includes the following:
-
-- User
-  - Login
-  - Register
-  - Logout
-- Article
-  - Create
-  - Update
-  - Get Article
-  - Get Articles
-  - Delete
-- Auth
-  - Refresh Token
-
-> In Login request in Tests tab:
-
-```
-pm.test("Status code is 200", function () {
-    pm.response.to.have.status(200);
-
-    var jsonData = JSON.parse(responseBody);
-    pm.globals.set("token", jsonData.token.access_token);
-    pm.globals.set("refresh_token", jsonData.token.refresh_token);
-
-});
+```bash
+mkdir cert/
+sh generate-certificate.sh
 ```
 
-It captures the `access_token` from the success login in the **global variable** for later use in other requests.
+To disable SSL, set `SSL=FALSE` in `.env`.
 
-Also, you will find in each request that needs to be authenticated you will have the following:
+## API Endpoints
 
-    Authorization -> Bearer Token with value of {{token}}
+### User
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/v1/user/register` | No | Register a new user |
+| POST | `/v1/user/login` | No | Login and receive JWT tokens |
+| GET | `/v1/user/logout` | Bearer | Logout (invalidates token) |
 
-It's very useful when you want to test the APIs in Postman without copying and pasting the tokens.
+### Article
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/v1/article` | Bearer | Create an article |
+| GET | `/v1/articles` | Bearer | Get all user articles |
+| GET | `/v1/article/:id` | Bearer | Get one article |
+| PUT | `/v1/article/:id` | Bearer | Update an article |
+| DELETE | `/v1/article/:id` | Bearer | Delete an article |
 
-## On You
+### Auth
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/v1/token/refresh` | No | Refresh access and refresh tokens |
 
-You will need to implement the `refresh_token` mechanism in your application (Frontend).
+### Invoice (Example)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/v1/invoice` | No | HTML preview of a sample invoice with download button |
+| GET | `/v1/invoice/download` | No | Download sample invoice as PDF |
 
-> We have the `/v1/token/refresh` API here to use it.
+## Swagger Docs
 
-_For example:_
+Generate and view API documentation:
 
-If the API sends `401` Status Unauthorized, then you can send the `refresh_token` that you stored it before from the Login API in POST `/v1/token/refresh` to receive the new `access_token` & `refresh_token` and store them again. Now, if you receive an error in refreshing the token, that means the user will have to Login again as something went wrong.
+```bash
+make generate_docs
+make run
+```
 
-That's just an example, of course you can implement your own way.
+Then open: `https://localhost:9000/swagger/index.html`
 
-## Version 1
+## Invoice Demo
 
-    No longer supported
+Once the server is running, open the invoice preview in your browser:
 
-You will find the last update on v1 in [v1-session-cookies-auth](https://github.com/Massad/gin-boilerplate/tree/v1-session-cookies-auth) branch or [v1.0.5 release](https://github.com/Massad/gin-boilerplate/releases/tag/1.05) that supported the authentication using the **session** and **cookies** stored in **Redis** if needed.
+```
+http://localhost:9000/v1/invoice
+```
 
-- [RedisStore](https://github.com/gin-gonic/contrib/tree/master/sessions): Gin middleware for session management with multi-backend support (currently cookie, Redis).
+The page shows an HTML invoice with a **Download PDF** button that generates a PDF using [maroto](https://github.com/johnfercher/maroto) (pure Go, no external dependencies).
 
-## Contribution
+## Trusted Proxies & CORS
 
-You are welcome to contribute to keep it up to date and always improving!
+By default, `SetTrustedProxies(nil)` is configured — Gin will not trust any proxy headers. If you deploy behind a reverse proxy (nginx, CloudFlare, etc.), set your trusted proxy IPs:
 
-If you have any question or need help, drop a message at [https://gitter.im/Massad/gin-boilerplate](https://gitter.im/Massad/gin-boilerplate)
+```go
+r.SetTrustedProxies([]string{"192.168.1.0/24", "10.0.0.0/8"})
+```
 
-## Credit
+CORS is configured in `middleware/cors.go`. Update the `Access-Control-Allow-Origin` header for your domain in production.
 
-The implemented JWT inspired from this article: [Using JWT for Authentication in a Golang Application](https://www.nexmo.com/blog/2020/03/13/using-jwt-for-authentication-in-a-golang-application-dr) worth reading it, thanks [Victor Steven](https://medium.com/@victorsteven)
+## Authentication
 
----
+This boilerplate uses **Bearer Token** authentication:
+
+1. **Login** returns an `access_token` (15 min) and `refresh_token` (7 days)
+2. Include the access token in requests: `Authorization: Bearer <access_token>`
+3. When the access token expires, use `/v1/token/refresh` with the refresh token to get new tokens
+4. Both tokens are stored in Redis and invalidated on logout
+
+## Project Structure
+
+```
+controllers/    HTTP handlers
+models/         Database structs and queries (sqlx + raw SQL)
+forms/          Request validation structs and reusable error translation
+middleware/     CORS, RequestID, and JWT auth middleware
+invoice/        Invoice HTML/PDF generation example
+db/             PostgreSQL and Redis initialization
+docs/           Swagger documentation (auto-generated)
+public/         Static files and HTML templates
+```
+
+## Adding a New Resource
+
+1. Create a model in `models/` with your SQL queries
+2. Create form structs in `forms/` with binding tags and a `ValidationMessages` map
+3. Create a controller in `controllers/` — use `forms.Translate(err, messages)` for validation errors
+4. Register routes in `main.go`
+5. Run `make generate_docs` to update Swagger
+
+## Previous Versions
+
+- **v2.0** — JWT authentication with Redis (current architecture)
+- **v1.x** — Session/cookie authentication ([v1 branch](https://github.com/Massad/gin-boilerplate/tree/v1-session-cookies-auth))
 
 ## License
 
-(The MIT License)
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+MIT

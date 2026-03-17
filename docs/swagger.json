@@ -13,7 +13,7 @@
             "name": "MIT License",
             "url": "https://github.com/Massad/gin-boilerplate/blob/master/LICENSE"
         },
-        "version": "1.0"
+        "version": "3.0"
     },
     "host": "localhost:9000",
     "basePath": "/v1",
@@ -182,6 +182,52 @@
                         "description": "Not Acceptable",
                         "schema": {
                             "$ref": "#/definitions/forms.ArticleResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/invoice": {
+            "get": {
+                "description": "Returns an HTML preview of a sample invoice",
+                "produces": [
+                    "text/html"
+                ],
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Preview Invoice as HTML",
+                "responses": {
+                    "200": {
+                        "description": "HTML page",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/invoice/download": {
+            "get": {
+                "description": "Generates and downloads a sample invoice as PDF",
+                "produces": [
+                    "application/pdf"
+                ],
+                "tags": [
+                    "Invoice"
+                ],
+                "summary": "Download Invoice as PDF",
+                "responses": {
+                    "200": {
+                        "description": "PDF file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "500": {
+                        "description": "Error generating PDF",
+                        "schema": {
+                            "type": "object"
                         }
                     }
                 }
@@ -397,7 +443,6 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "fullName rule is in validator.go",
                     "type": "string",
                     "maxLength": 20,
                     "minLength": 3
@@ -503,6 +548,17 @@
                 }
             }
         },
+        "models.Token": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "models.User": {
             "type": "object",
             "properties": {
@@ -524,7 +580,7 @@
                     "type": "string"
                 },
                 "token": {
-                    "type": "string"
+                    "$ref": "#/definitions/models.Token"
                 },
                 "user": {
                     "$ref": "#/definitions/models.User"

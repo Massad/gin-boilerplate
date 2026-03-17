@@ -7,9 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
-
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -18,23 +16,14 @@ import (
 	"github.com/Massad/gin-boilerplate/controllers"
 	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/Massad/gin-boilerplate/invoice"
+	"github.com/Massad/gin-boilerplate/middleware"
 	"github.com/joho/godotenv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/stretchr/testify/assert"
 )
-
-var auth = new(controllers.AuthController)
-
-//TokenAuthMiddleware ...
-//JWT Authentication middleware attached to each request that needs to be authenitcated to validate the access_token in the header
-func TokenAuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		auth.TokenValid(c)
-		c.Next()
-	}
-}
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
@@ -50,7 +39,7 @@ func SetupRouter() *gin.Engine {
 
 		v1.POST("/user/login", user.Login)
 		v1.POST("/user/register", user.Register)
-		v1.GET("/user/logout", user.Logout)
+		v1.GET("/user/logout", middleware.TokenAuth(), user.Logout)
 
 		/*** START AUTH ***/
 		auth := new(controllers.AuthController)
@@ -60,12 +49,20 @@ func SetupRouter() *gin.Engine {
 		/*** START Article ***/
 		article := new(controllers.ArticleController)
 
-		v1.POST("/article", TokenAuthMiddleware(), article.Create)
-		v1.GET("/articles", TokenAuthMiddleware(), article.All)
-		v1.GET("/article/:id", TokenAuthMiddleware(), article.One)
-		v1.PUT("/article/:id", TokenAuthMiddleware(), article.Update)
-		v1.DELETE("/article/:id", TokenAuthMiddleware(), article.Delete)
+		v1.POST("/article", middleware.TokenAuth(), article.Create)
+		v1.GET("/articles", middleware.TokenAuth(), article.All)
+		v1.GET("/article/:id", middleware.TokenAuth(), article.One)
+		v1.PUT("/article/:id", middleware.TokenAuth(), article.Update)
+		v1.DELETE("/article/:id", middleware.TokenAuth(), article.Delete)
+
+		/*** START Invoice ***/
+		inv := new(invoice.InvoiceController)
+
+		v1.GET("/invoice", inv.Preview)
+		v1.GET("/invoice/download", inv.Download)
 	}
+
+	r.LoadHTMLGlob("../public/html/*")
 
 	return r
 }
@@ -98,8 +95,6 @@ func TestIntDB(t *testing.T) {
 	if err != nil {
 		log.Fatal("Error loading .env file, please create one in the root directory")
 	}
-
-	fmt.Println("DB_PASS", os.Getenv("DB_PASS"))
 
 	db.Init()
 	db.InitRedis(1)
@@ -193,7 +188,7 @@ func TestLogin(t *testing.T) {
 
 	testRouter.ServeHTTP(resp, req)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -277,7 +272,7 @@ func TestCreateArticle(t *testing.T) {
 	resp := httptest.NewRecorder()
 	testRouter.ServeHTTP(resp, req)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -544,6 +539,52 @@ func TestUserLogout(t *testing.T) {
 	testRouter.ServeHTTP(resp, req)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
+}
+
+/**
+* TestInvoicePreview
+* Test invoice HTML preview
+*
+* Must return response code 200
+ */
+func TestInvoicePreview(t *testing.T) {
+	testRouter := SetupRouter()
+
+	req, err := http.NewRequest("GET", "/v1/invoice", nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	resp := httptest.NewRecorder()
+	testRouter.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Contains(t, resp.Header().Get("Content-Type"), "text/html")
+	assert.Contains(t, resp.Body.String(), "INV-001")
+	assert.Contains(t, resp.Body.String(), "Acme Corp")
+}
+
+/**
+* TestInvoiceDownload
+* Test invoice PDF download
+*
+* Must return response code 200 with PDF content type
+ */
+func TestInvoiceDownload(t *testing.T) {
+	testRouter := SetupRouter()
+
+	req, err := http.NewRequest("GET", "/v1/invoice/download", nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	resp := httptest.NewRecorder()
+	testRouter.ServeHTTP(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Equal(t, "application/pdf", resp.Header().Get("Content-Type"))
+	assert.Contains(t, resp.Header().Get("Content-Disposition"), "INV-001.pdf")
+	assert.True(t, resp.Body.Len() > 0, "PDF body should not be empty")
 }
 
 /**

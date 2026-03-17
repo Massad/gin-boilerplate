@@ -38,7 +38,6 @@ definitions:
       email:
         type: string
       name:
-        description: fullName rule is in validator.go
         maxLength: 20
         minLength: 3
         type: string
@@ -111,6 +110,13 @@ definitions:
       meta:
         $ref: '#/definitions/models.Meta'
     type: object
+  models.Token:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
   models.User:
     properties:
       email:
@@ -125,7 +131,7 @@ definitions:
       message:
         type: string
       token:
-        type: string
+        $ref: '#/definitions/models.Token'
       user:
         $ref: '#/definitions/models.User'
     type: object
@@ -154,7 +160,7 @@ info:
     url: https://github.com/Massad/gin-boilerplate/blob/master/LICENSE
   termsOfService: http://swagger.io/terms/
   title: Golang Gin Boilerplate
-  version: "1.0"
+  version: "3.0"
 paths:
   /article:
     post:
@@ -267,6 +273,36 @@ paths:
       summary: Get All Articles example
       tags:
       - Article
+  /invoice:
+    get:
+      description: Returns an HTML preview of a sample invoice
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      summary: Preview Invoice as HTML
+      tags:
+      - Invoice
+  /invoice/download:
+    get:
+      description: Generates and downloads a sample invoice as PDF
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: PDF file
+          schema:
+            type: file
+        "500":
+          description: Error generating PDF
+          schema:
+            type: object
+      summary: Download Invoice as PDF
+      tags:
+      - Invoice
   /token/refresh:
     post:
       consumes:
