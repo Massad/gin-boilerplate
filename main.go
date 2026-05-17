@@ -47,6 +47,18 @@ func main() {
 		log.Fatal("error: failed to load the env file")
 	}
 
+	// Validate that security-critical secrets are set
+	requiredSecrets := map[string]string{
+		"ACCESS_SECRET":  os.Getenv("ACCESS_SECRET"),
+		"REFRESH_SECRET": os.Getenv("REFRESH_SECRET"),
+		"REDIS_SECRET":   os.Getenv("REDIS_SECRET"),
+	}
+	for name, value := range requiredSecrets {
+		if value == "" {
+			log.Fatalf("error: %s is not set in the env file — generate a cryptographically random secret", name)
+		}
+	}
+
 	if os.Getenv("ENV") == "PRODUCTION" {
 		gin.SetMode(gin.ReleaseMode)
 	}
