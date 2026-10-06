@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Massad/gin-boilerplate/db"
+	"github.com/go-redis/redis/v7"
 	jwt "github.com/golang-jwt/jwt/v4"
 	uuid "github.com/google/uuid"
 )
@@ -168,4 +169,17 @@ func (m AuthModel) DeleteAuth(givenUUID string) (int64, error) {
 		return 0, err
 	}
 	return deleted, nil
+}
+
+var consumeRefreshAuth = redis.NewScript(`
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+end
+return 0
+`)
+
+// ConsumeRefreshAuth atomically verifies the stored owner and consumes a refresh
+// token once. A mismatched owner must not invalidate someone else's session.
+func (m AuthModel) ConsumeRefreshAuth(refreshUUID string, userID int64) (int64, error) {
+	return consumeRefreshAuth.Run(db.GetRedis(), []string{refreshUUID}, strconv.FormatInt(userID, 10)).Int64()
 }

@@ -6,19 +6,19 @@ run:
 ## RUN TESTS
 test:
 	@echo -e "🔍 Running tests..."
-	@go test -v ./tests/*
+	@go test -mod=readonly -count=1 -v -tags=all ./...
 
-## INSTALL SWAG CLI TOOL & PACKAGES
+SWAG_VERSION := v1.16.6
+SWAG_BIN := $(CURDIR)/.cache/tools/swag/$(SWAG_VERSION)/swag
+
+## INSTALL THE PINNED SWAG CLI
 install_swag:
-	@echo -e "📥 Installing Swag CLI and dependencies..."
-	@which swag >/dev/null 2>&1 || (echo -e "❌ Swag CLI not found! Installing now..." && go install github.com/swaggo/swag/cmd/swag@latest)
-	@echo -e "🔄 Updating project dependencies for Swag..."
-	@go mod tidy
-	@go mod download
-	@echo -e "✅ Swag installation complete!"
+	@echo "Installing Swag $(SWAG_VERSION)..."
+	@mkdir -p "$(dir $(SWAG_BIN))"
+	@GOBIN="$(dir $(SWAG_BIN))" go install github.com/swaggo/swag/cmd/swag@$(SWAG_VERSION)
 
 ## GENERATE API DOCUMENTATION
 generate_docs: install_swag
 	@echo -e "📜 Generating API documentation using Swag..."
-	@swag init
+	@"$(SWAG_BIN)" init
 	@echo -e "✅ API documentation generated successfully!"

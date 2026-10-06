@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/Massad/gin-boilerplate/config"
 	"github.com/Massad/gin-boilerplate/controllers"
 	"github.com/Massad/gin-boilerplate/db"
 	_ "github.com/Massad/gin-boilerplate/docs"
@@ -45,6 +46,10 @@ func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("error: failed to load the env file")
+	}
+
+	if err := config.ValidateSigningSecrets(os.Getenv); err != nil {
+		log.Fatal(err)
 	}
 
 	if os.Getenv("ENV") == "PRODUCTION" {

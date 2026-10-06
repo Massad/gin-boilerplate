@@ -24,7 +24,7 @@ The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/
 
 ### Prerequisites
 
-- Go 1.24+
+- Go 1.26.8+
 - PostgreSQL
 - Redis
 
@@ -47,8 +47,18 @@ Set up your environment:
 
 ```bash
 cp .env_rename_me .env
-# Edit .env with your database credentials
+# Edit .env with your database credentials and signing keys
 ```
+
+Generate independent access and refresh signing keys by running
+`openssl rand -hex 32` twice, then paste one result into `ACCESS_SECRET` and
+the other into `REFRESH_SECRET` in your local `.env`. Keep that file private.
+The application refuses to start with blank keys, keys shorter than 32 bytes,
+or identical access and refresh keys. Redis authentication uses
+`REDIS_PASSWORD` when configured on your Redis server.
+
+Existing installations that copied the old sample signing keys must replace
+both keys. Changing them invalidates existing tokens, so users must log in again.
 
 Import the database schema:
 
@@ -82,8 +92,15 @@ go build -v
 Tests are integration tests that require running PostgreSQL and Redis:
 
 ```bash
-go test -v -tags=all ./tests/*
+set -a
+. ./.env
+set +a
+make test
 ```
+
+Use a dedicated test database and Redis instance. The connection parser tests
+require PostgreSQL trust authentication because they exercise different password
+values. CI provisions disposable services for these checks.
 
 ### SSL (Optional)
 
@@ -163,7 +180,12 @@ This boilerplate uses **Bearer Token** authentication:
 1. **Login** returns an `access_token` (15 min) and `refresh_token` (7 days)
 2. Include the access token in requests: `Authorization: Bearer <access_token>`
 3. When the access token expires, use `/v1/token/refresh` with the refresh token to get new tokens
-4. Both tokens are stored in Redis and invalidated on logout
+4. Both tokens are stored in Redis. Logout invalidates the presented access token;
+   refresh tokens remain valid until rotation or expiry.
+
+Refresh rotation checks the stored Redis owner and consumes the refresh token
+atomically. If you restrict Redis commands with an ACL, allow `EVAL` and
+`EVALSHA` for this operation.
 
 ## Project Structure
 

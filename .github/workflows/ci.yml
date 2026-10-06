@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ENV: PRODUCTION
+      SSL: "FALSE"
+      PORT: "9000"
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: golang_gin_db
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      REDIS_HOST: 127.0.0.1:6379
+      REDIS_PASSWORD: ""
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Configure disposable test services
+        run: |
+          touch .env
+          echo "ACCESS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "REFRESH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          psql -h 127.0.0.1 -U postgres -d postgres -c 'CREATE DATABASE golang_gin_db'
+          psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1 -f db/database.sql
+      - name: Build and vet
+        run: |
+          go mod verify
+          go build -mod=readonly -o /tmp/gin-boilerplate .
+          go vet -mod=readonly ./...
+      - name: Test
+        run: go test -mod=readonly -count=1 -race -v -tags=all ./...
+      - name: Smoke test production routes
+        run: |
+          smoke_dir=$(mktemp -d)
+          export SMOKE_DIR="$smoke_dir"
+          /tmp/gin-boilerplate > /tmp/gin-boilerplate.log 2>&1 &
+          server_pid=$!
+          cleanup() {
+            result=$?
+            if [ "$result" -ne 0 ]; then
+              tail -n 200 /tmp/gin-boilerplate.log
+            fi
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+            rm -rf "$smoke_dir"
+            exit "$result"
+          }
+          trap cleanup EXIT
+          ready=false
+          for attempt in {1..50}; do
+            kill -0 "$server_pid"
+            if curl --fail --silent --connect-timeout 2 --max-time 2 http://127.0.0.1:9000/ > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 0.1
+          done
+          if [ "$ready" != true ]; then
+            exit 1
+          fi
+          for encoding in identity gzip; do
+            for path in / /v1/invoice /v1/invoice/download /swagger/index.html /swagger/doc.json /swagger/swagger-initializer.js /swagger/swagger-ui.css /swagger/swagger-ui-bundle.js /v1/articles; do
+              status=$(curl --compressed --silent --show-error --connect-timeout 2 --max-time 10 \
+                -H "Accept-Encoding: $encoding" -D "$smoke_dir/headers" -o "$smoke_dir/body" \
+                --write-out '%{http_code}' "http://127.0.0.1:9000$path")
+              python3 - "$path" "$status" "$encoding" <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          route, status, encoding = sys.argv[1:]
+          output = Path(os.environ["SMOKE_DIR"])
+          body = (output / "body").read_bytes()
+          headers = (output / "headers").read_text().lower()
+          expected = "401" if route == "/v1/articles" else "200"
+          assert status == expected, (route, status, expected)
+          fragments = {
+              "/": b"Gin Boilerplate",
+              "/v1/invoice": b"INV-001",
+              "/swagger/index.html": b"swagger-ui",
+              "/swagger/swagger-initializer.js": b"SwaggerUIBundle",
+              "/swagger/swagger-ui.css": b".swagger-ui",
+              "/swagger/swagger-ui-bundle.js": b"SwaggerUIBundle",
+              "/v1/articles": b"Please login first",
+          }
+          if route in fragments:
+              assert fragments[route] in body, (route, "unexpected body")
+          if route == "/v1/invoice/download":
+              assert body.startswith(b"%PDF-"), "invalid PDF signature"
+              assert "content-type: application/pdf" in headers, "invalid PDF content type"
+          if route == "/swagger/doc.json":
+              document = json.loads(body)
+              assert document["swagger"] == "2.0" and document["paths"], "invalid Swagger document"
+          if encoding == "gzip" and route == "/":
+              assert "content-encoding: gzip" in headers, "gzip response missing"
+          if encoding == "identity":
+              assert "content-encoding: gzip" not in headers, "unexpected gzip response"
+          print(f"PASS {route}: status={status}, encoding={encoding}")
+          PY
+            done
+          done
+      - name: Check Go vulnerabilities
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+          govulncheck ./...
