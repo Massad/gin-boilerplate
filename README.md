@@ -24,7 +24,7 @@ The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/
 
 ### Prerequisites
 
-- Go 1.26.6+
+- Go 1.26.8+
 - PostgreSQL
 - Redis
 
