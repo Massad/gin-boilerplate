@@ -24,7 +24,7 @@ The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/
 
 ### Prerequisites
 
-- Go 1.24+
+- Go 1.26.1+
 - PostgreSQL
 - Redis
 
@@ -47,8 +47,18 @@ Set up your environment:
 
 ```bash
 cp .env_rename_me .env
-# Edit .env with your database credentials
+# Edit .env with your database credentials and signing keys
 ```
+
+Generate independent access and refresh signing keys by running
+`openssl rand -hex 32` twice, then paste one result into `ACCESS_SECRET` and
+the other into `REFRESH_SECRET` in your local `.env`. Keep that file private.
+The application refuses to start with blank keys, keys shorter than 32 bytes,
+or identical access and refresh keys. Redis authentication uses
+`REDIS_PASSWORD` when configured on your Redis server.
+
+Existing installations that copied the old sample signing keys must replace
+both keys. Changing them invalidates existing tokens, so users must log in again.
 
 Import the database schema:
 
