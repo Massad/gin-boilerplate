@@ -6,7 +6,7 @@ run:
 ## RUN TESTS
 test:
 	@echo -e "🔍 Running tests..."
-	@go test -v ./tests/*
+	@go test -mod=readonly -count=1 -v -tags=all ./...
 
 ## INSTALL SWAG CLI TOOL & PACKAGES
 install_swag:

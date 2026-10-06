@@ -24,7 +24,7 @@ The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/
 
 ### Prerequisites
 
-- Go 1.26.1+
+- Go 1.26.6+
 - PostgreSQL
 - Redis
 
@@ -92,8 +92,15 @@ go build -v
 Tests are integration tests that require running PostgreSQL and Redis:
 
 ```bash
-go test -v -tags=all ./tests/*
+set -a
+. ./.env
+set +a
+make test
 ```
+
+Use a dedicated test database and Redis instance. The connection parser tests
+require PostgreSQL trust authentication because they exercise different password
+values. CI provisions disposable services for these checks.
 
 ### SSL (Optional)
 
@@ -174,6 +181,10 @@ This boilerplate uses **Bearer Token** authentication:
 2. Include the access token in requests: `Authorization: Bearer <access_token>`
 3. When the access token expires, use `/v1/token/refresh` with the refresh token to get new tokens
 4. Both tokens are stored in Redis and invalidated on logout
+
+Refresh rotation checks the stored Redis owner and consumes the refresh token
+atomically. If you restrict Redis commands with an ACL, allow `EVAL` and
+`EVALSHA` for this operation.
 
 ## Project Structure
 
