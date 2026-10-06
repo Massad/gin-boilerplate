@@ -4,35 +4,43 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
+	_redis "github.com/go-redis/redis/v7"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	_redis "github.com/go-redis/redis/v7"
 )
 
 var dbConn *sqlx.DB
 
 // Init connects to PostgreSQL using environment variables.
 func Init() {
-	sslMode := "disable"
-	if os.Getenv("SSL") == "TRUE" {
-		sslMode = "require"
-	}
-
-	dbinfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASS"),
-		os.Getenv("DB_NAME"),
-		sslMode,
-	)
-
 	var err error
-	dbConn, err = sqlx.Connect("postgres", dbinfo)
+	dbConn, err = sqlx.Connect("postgres", postgresDSN(os.Getenv))
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func postgresDSN(getenv func(string) string) string {
+	sslMode := "disable"
+	if getenv("SSL") == "TRUE" {
+		sslMode = "require"
+	}
+
+	// lib/pq keyword values must be quoted, including empty strings. Otherwise
+	// whitespace or quotes in a value can change how later options are parsed.
+	quote := func(value string) string {
+		return "'" + strings.NewReplacer("\\", "\\\\", "'", "\\'").Replace(value) + "'"
+	}
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		quote(getenv("DB_HOST")),
+		quote(getenv("DB_PORT")),
+		quote(getenv("DB_USER")),
+		quote(getenv("DB_PASS")),
+		quote(getenv("DB_NAME")),
+		sslMode,
+	)
 }
 
 // GetDB returns the sqlx database connection.
