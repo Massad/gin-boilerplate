@@ -180,7 +180,8 @@ This boilerplate uses **Bearer Token** authentication:
 1. **Login** returns an `access_token` (15 min) and `refresh_token` (7 days)
 2. Include the access token in requests: `Authorization: Bearer <access_token>`
 3. When the access token expires, use `/v1/token/refresh` with the refresh token to get new tokens
-4. Both tokens are stored in Redis and invalidated on logout
+4. Both tokens are stored in Redis. Logout invalidates the presented access token;
+   refresh tokens remain valid until rotation or expiry.
 
 Refresh rotation checks the stored Redis owner and consumes the refresh token
 atomically. If you restrict Redis commands with an ACL, allow `EVAL` and
