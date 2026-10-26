@@ -71,6 +71,8 @@ jobs:
           go mod verify
           go build -mod=readonly -o /tmp/gin-boilerplate .
           go vet -mod=readonly ./...
+      - name: Install PDF content test dependency
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
       - name: Test
         run: go test -mod=readonly -count=1 -race -v -tags=all ./...
       - name: Smoke test production routes
