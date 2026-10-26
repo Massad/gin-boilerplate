@@ -24,7 +24,7 @@ The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/
 
 ### Prerequisites
 
-- Go 1.26.8+
+- Go 1.26.10+
 - PostgreSQL
 - Redis
 
@@ -89,7 +89,15 @@ go build -v
 
 ### Testing
 
-Tests are integration tests that require running PostgreSQL and Redis:
+Invoice PDF content tests use `pdftotext` to verify the rendered invoice number,
+line items, and totals. Install it with `brew install poppler` on macOS or
+`sudo apt-get install poppler-utils` on Ubuntu, then run without database services:
+
+```bash
+go test -mod=readonly -count=1 -race -v ./invoice
+```
+
+The full integration suite also requires running PostgreSQL and Redis:
 
 ```bash
 set -a
