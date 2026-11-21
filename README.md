@@ -4,19 +4,22 @@
 
 # Golang Gin Boilerplate v3
 
-The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/gin-gonic/gin/) — structured with **PostgreSQL**, **JWT** authentication stored in **Redis**, and ready to build on.
+The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/gin-gonic/gin/) — structured with **PostgreSQL** (multi-tenant Row-Level Security), **JWT** authentication stored in **Redis**, and ready to build on.
 
 ## What's Included
 
-- [sqlx](https://github.com/jmoiron/sqlx): Lightweight SQL extensions for Go
+- [pgx](https://github.com/jackc/pgx): PostgreSQL driver and connection pooling (pgxpool, per-tenant and platform pools)
+- [sqlc](https://github.com/sqlc-dev/sqlc): Type-safe Go code generated from versioned SQL queries
+- [goose](https://github.com/pressly/goose): Versioned database migrations
 - [jwt-go](https://github.com/golang-jwt/jwt): JSON Web Tokens (JWT) middleware
 - [go-redis](https://github.com/go-redis/redis): Redis client
 - [maroto](https://github.com/johnfercher/maroto): Pure Go PDF generation
-- Built-in **CORS**, **RequestID**, and **Auth** middleware
+- Built-in **CORS**, **RequestID**, and **Auth** middleware (tenant and admin tokens)
 - Built-in **custom form validators** with reusable error translation
+- **Multi-tenant isolation** — shared schema + `tenant_id` enforced by fail-closed PostgreSQL RLS
+- **Admin backoffice foundation** — separate superadmin login, tenant status control, audit trail
 - **Invoice example** — HTML preview and PDF download
 - **Swagger API documentation**
-- PostgreSQL with JSON/JSONB queries and trigger functions
 - SSL support
 - Go Modules
 
@@ -25,7 +28,7 @@ The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/
 ### Prerequisites
 
 - Go 1.26.10+
-- PostgreSQL
+- PostgreSQL 13+ (uuid primary keys use `gen_random_uuid()`)
 - Redis
 
 ### Setup
@@ -50,23 +53,43 @@ cp .env_rename_me .env
 # Edit .env with your database credentials and signing keys
 ```
 
-Generate independent access and refresh signing keys by running
-`openssl rand -hex 32` twice, then paste one result into `ACCESS_SECRET` and
-the other into `REFRESH_SECRET` in your local `.env`. Keep that file private.
+Generate each signing key separately with `openssl rand -hex 32`, then paste
+results into `ACCESS_SECRET`, `REFRESH_SECRET`, and `ADMIN_ACCESS_SECRET`
+(the superadmin access tokens) in your local `.env`. Keep that file private.
 The application refuses to start with blank keys, keys shorter than 32 bytes,
-or identical access and refresh keys. Redis authentication uses
+or identical keys. Redis authentication uses
 `REDIS_PASSWORD` when configured on your Redis server.
 
-Existing installations that copied the old sample signing keys must replace
-both keys. Changing them invalidates existing tokens, so users must log in again.
+Existing installations must generate the new admin key along with the two
+original ones. Changing them invalidates existing tokens, so users must log
+in again.
 
-Import the database schema:
+Run the database migrations. The first run needs a PostgreSQL superuser
+because the migrations themselves create the `app_user` and `app_admin`
+application roles (the application must never connect as the superuser) —
+override `DB_USER`/`DB_PASS` just for this command:
 
 ```bash
-psql -U postgres -h localhost < ./db/database.sql
+set -a
+. ./.env
+set +a
+make migrate_up DB_USER=postgres DB_PASS='<superuser password>'
 ```
 
-The database includes trigger functions (`created_at_column()` and `update_at_column()`) that automatically manage `created_at` and `updated_at` timestamps on the **user** and **article** tables.
+Migrations are versioned SQL files in `db/migrations/` managed with
+[goose](https://github.com/pressly/goose). All application queries live in
+`db/queries/*.sql` and are compiled to type-safe Go code with
+[sqlc](https://github.com/sqlc-dev/sqlc). The `app_user` role is a
+non-superuser constrained by Row-Level Security; `app_admin` bypasses RLS
+for platform-level operations only (login, registration, admin backoffice).
+For production, set the application role passwords with
+`ALTER ROLE ... PASSWORD`.
+
+Create the superadmin account (CLI bootstrap, no HTTP route involved):
+
+```bash
+go run *.go -create-admin -email you@example.com -password 'a long random password'
+```
 
 ### Running
 
@@ -126,15 +149,15 @@ To disable SSL, set `SSL=FALSE` in `.env`.
 ### User
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/v1/user/register` | No | Register a new user |
-| POST | `/v1/user/login` | No | Login and receive JWT tokens |
+| POST | `/v1/user/register` | No | Register a new user (creates the tenant and its owner) |
+| POST | `/v1/user/login` | No | Login and receive JWT tokens with the tenant details |
 | GET | `/v1/user/logout` | Bearer | Logout (invalidates token) |
 
 ### Article
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/v1/article` | Bearer | Create an article |
-| GET | `/v1/articles` | Bearer | Get all user articles |
+| GET | `/v1/articles` | Bearer | Get all articles of the current tenant member |
 | GET | `/v1/article/:id` | Bearer | Get one article |
 | PUT | `/v1/article/:id` | Bearer | Update an article |
 | DELETE | `/v1/article/:id` | Bearer | Delete an article |
@@ -143,6 +166,19 @@ To disable SSL, set `SSL=FALSE` in `.env`.
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | POST | `/v1/token/refresh` | No | Refresh access and refresh tokens |
+
+### Admin
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/v1/admin/login` | No | Superadmin login, returns an admin access token |
+| GET | `/v1/admin/logout` | Admin | Logout (invalidates token) |
+| GET | `/v1/admin/tenants` | Admin | List tenants |
+| POST | `/v1/admin/tenants/:id/status` | Admin | Suspend or activate a tenant |
+
+### Public
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/v1/public/:slug` | No | Public tenant lookup by slug (name and status only) |
 
 ### Invoice (Example)
 | Method | Path | Auth | Description |
@@ -195,26 +231,48 @@ Refresh rotation checks the stored Redis owner and consumes the refresh token
 atomically. If you restrict Redis commands with an ACL, allow `EVAL` and
 `EVALSHA` for this operation.
 
+Admin sessions use a single access token signed with the separate
+`ADMIN_ACCESS_SECRET` (no admin refresh endpoint). It lives ~8 hours and is
+revoked immediately on logout.
+
+## Multi-Tenancy
+
+Every user belongs to a tenant created at registration (`company` becomes a
+unique slug). Data isolation is enforced by PostgreSQL Row-Level Security on
+a shared schema with a `tenant_id` column — fail-closed policies that return
+zero rows when no tenant context is set — never by application-side filtering
+alone. The tenant always comes from the signed JWT, never from a client
+header or hostname. Platform operations (login, registration, admin
+backoffice) run through a dedicated role that bypasses RLS, while all
+business queries run through the constrained role inside a tenant-scoped
+transaction. Integration tests run as non-superuser roles, so the policies
+are exercised for real.
+
 ## Project Structure
 
 ```
 controllers/    HTTP handlers
-models/         Database structs and queries (sqlx + raw SQL)
+models/         Database structs and business services (sqlc-generated queries)
 forms/          Request validation structs and reusable error translation
-middleware/     CORS, RequestID, and JWT auth middleware
+middleware/     CORS, RequestID, JWT auth (tenant + admin), RBAC helper
+internal/db/    sqlc-generated code + pgxpool bootstrap (tenant & admin pools)
+db/queries/     SQL sources for sqlc — all application queries live here
+db/migrations/  Versioned goose migrations
+db/             Redis initialization
+config/         Signing secrets validation
 invoice/        Invoice HTML/PDF generation example
-db/             PostgreSQL and Redis initialization
 docs/           Swagger documentation (auto-generated)
 public/         Static files and HTML templates
+tests/          Integration tests
 ```
 
 ## Adding a New Resource
 
-1. Create a model in `models/` with your SQL queries
-2. Create form structs in `forms/` with binding tags and a `ValidationMessages` map
-3. Create a controller in `controllers/` — use `forms.Translate(err, messages)` for validation errors
-4. Register routes in `main.go`
-5. Run `make generate_docs` to update Swagger
+1. Write the SQL queries in `db/queries/*.sql` and run `make generate_sqlc` (commit the regenerated `internal/db/` code)
+2. Add a model in `models/` calling the generated queries through the tenant or admin store
+3. Create form structs in `forms/` with binding tags and a `ValidationMessages` map
+4. Create a controller in `controllers/` — use `forms.Translate(err, messages)` for validation errors
+5. Register routes in `main.go` and run `make generate_docs` to update Swagger
 
 ## Previous Versions
 

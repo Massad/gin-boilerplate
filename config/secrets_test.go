@@ -8,24 +8,31 @@ import (
 func TestValidateSigningSecrets(t *testing.T) {
 	access := strings.Repeat("a1", 32)
 	refresh := strings.Repeat("b2", 32)
+	admin := strings.Repeat("c3", 32)
 	cases := []struct {
-		name, access, refresh, want string
+		name, access, refresh, admin, want string
 	}{
-		{"independent keys without unused Redis secret", access, refresh, ""},
-		{"missing access key", "", refresh, "ACCESS_SECRET"},
-		{"missing refresh key", access, "", "REFRESH_SECRET"},
-		{"whitespace access key", strings.Repeat(" ", 64), refresh, "ACCESS_SECRET"},
-		{"whitespace refresh key", access, strings.Repeat("\t", 64), "REFRESH_SECRET"},
-		{"short access key", strings.Repeat("a", 31), refresh, "ACCESS_SECRET"},
-		{"short refresh key", access, strings.Repeat("b", 31), "REFRESH_SECRET"},
-		{"old sample access key", "ashasdjhjhjadhasdaa123", refresh, "ACCESS_SECRET"},
-		{"old sample refresh key", access, "hjsajdhkjhf41jhagggdga", "REFRESH_SECRET"},
-		{"same keys", access, access, "must be different"},
-		{"minimum length", strings.Repeat("a", 32), strings.Repeat("b", 32), ""},
+		{"independent keys", access, refresh, admin, ""},
+		{"missing access key", "", refresh, admin, "ACCESS_SECRET"},
+		{"missing refresh key", access, "", admin, "REFRESH_SECRET"},
+		{"missing admin key", access, refresh, "", "ADMIN_ACCESS_SECRET"},
+		{"whitespace access key", strings.Repeat(" ", 64), refresh, admin, "ACCESS_SECRET"},
+		{"whitespace refresh key", access, strings.Repeat("\t", 64), admin, "REFRESH_SECRET"},
+		{"whitespace admin key", access, refresh, strings.Repeat("\n", 64), "ADMIN_ACCESS_SECRET"},
+		{"short access key", strings.Repeat("a", 31), refresh, admin, "ACCESS_SECRET"},
+		{"short refresh key", access, strings.Repeat("b", 31), admin, "REFRESH_SECRET"},
+		{"short admin key", access, refresh, strings.Repeat("c", 31), "ADMIN_ACCESS_SECRET"},
+		{"old sample access key", "ashasdjhjhjadhasdaa123", refresh, admin, "ACCESS_SECRET"},
+		{"old sample refresh key", access, "hjsajdhkjhf41jhagggdga", admin, "REFRESH_SECRET"},
+		{"old sample admin key", access, refresh, "admin-sentence-too-short", "ADMIN_ACCESS_SECRET"},
+		{"access and refresh equal", access, access, admin, "must be different"},
+		{"access and admin equal", access, refresh, access, "must be different"},
+		{"refresh and admin equal", access, refresh, refresh, "must be different"},
+		{"minimum length", strings.Repeat("a", 32), strings.Repeat("b", 32), strings.Repeat("c", 32), ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			values := map[string]string{"ACCESS_SECRET": tc.access, "REFRESH_SECRET": tc.refresh}
+			values := map[string]string{"ACCESS_SECRET": tc.access, "REFRESH_SECRET": tc.refresh, "ADMIN_ACCESS_SECRET": tc.admin}
 			err := ValidateSigningSecrets(func(name string) string { return values[name] })
 			if tc.want == "" {
 				if err != nil {
@@ -36,11 +43,10 @@ func TestValidateSigningSecrets(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("expected error containing %q, got %v", tc.want, err)
 			}
-			if tc.access != "" && strings.Contains(err.Error(), tc.access) {
-				t.Fatal("error reveals access key")
-			}
-			if tc.refresh != "" && strings.Contains(err.Error(), tc.refresh) {
-				t.Fatal("error reveals refresh key")
+			for name, key := range map[string]string{"ACCESS_SECRET": tc.access, "REFRESH_SECRET": tc.refresh, "ADMIN_ACCESS_SECRET": tc.admin} {
+				if key != "" && strings.Contains(err.Error(), key) {
+					t.Fatalf("error reveals %s key: %v", name, err)
+				}
 			}
 		})
 	}

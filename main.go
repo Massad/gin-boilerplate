@@ -1,18 +1,27 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Massad/gin-boilerplate/config"
 	"github.com/Massad/gin-boilerplate/controllers"
 	"github.com/Massad/gin-boilerplate/db"
 	_ "github.com/Massad/gin-boilerplate/docs"
 	"github.com/Massad/gin-boilerplate/forms"
+	pgdb "github.com/Massad/gin-boilerplate/internal/db"
 	"github.com/Massad/gin-boilerplate/invoice"
 	"github.com/Massad/gin-boilerplate/middleware"
+	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -42,10 +51,48 @@ import (
 
 // @externalDocs.description  OpenAPI
 // @externalDocs.url          https://swagger.io/resources/open-api/
+
+// runCreateAdmin bootstraps the platform superadmin through the dedicated admin
+// pool: no HTTP route is ever exposed for this bootstrap.
+func runCreateAdmin(ctx context.Context, getenv func(string) string, email, password string) error {
+	if strings.TrimSpace(email) == "" || strings.TrimSpace(password) == "" {
+		return errors.New("error: -email and -password are required")
+	}
+	if err := pgdb.InitAdmin(ctx, getenv); err != nil {
+		return err
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	if _, err := (models.AdminModel{}).Create(email, string(hashed)); err != nil {
+		return err
+	}
+	fmt.Printf("Superadmin %s created\n", strings.ToLower(strings.TrimSpace(email)))
+	pgdb.Close()
+	return nil
+}
+
 func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("error: failed to load the env file")
+	}
+
+	// The superadmin bootstrap is a CLI flag, parsed before any HTTP runtime:
+	// the process exits right after the creation.
+	var createAdmin bool
+	var adminEmail, adminPassword string
+	flag.BoolVar(&createAdmin, "create-admin", false, "create or reset the platform superadmin and exit")
+	flag.StringVar(&adminEmail, "email", "", "superadmin email")
+	flag.StringVar(&adminPassword, "password", "", "superadmin password")
+	flag.Parse()
+
+	if createAdmin {
+		if err := runCreateAdmin(context.Background(), os.Getenv, adminEmail, adminPassword); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 	if err := config.ValidateSigningSecrets(os.Getenv); err != nil {
@@ -65,7 +112,14 @@ func main() {
 	r.Use(middleware.RequestID())
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
-	db.Init()
+	ctx := context.Background()
+	if err := pgdb.InitTenant(ctx, os.Getenv); err != nil {
+		log.Fatal(err)
+	}
+	if err := pgdb.InitAdmin(ctx, os.Getenv); err != nil {
+		log.Fatal(err)
+	}
+	defer pgdb.Close()
 	db.InitRedis(1)
 
 	v1 := r.Group("/v1")
@@ -96,6 +150,22 @@ func main() {
 
 		v1.GET("/invoice", inv.Preview)
 		v1.GET("/invoice/download", inv.Download)
+
+		/*** START ADMIN ***/
+		admin := new(controllers.AdminController)
+
+		v1.POST("/admin/login", admin.Login)
+		adminAPI := v1.Group("/admin", middleware.AdminAuth())
+		{
+			adminAPI.GET("/logout", admin.Logout)
+			adminAPI.GET("/tenants", admin.Tenants)
+			adminAPI.POST("/tenants/:id/status", admin.SetTenantStatus)
+		}
+
+		/*** START PUBLIC ***/
+		pub := new(controllers.PublicController)
+
+		v1.GET("/public/:slug", pub.One)
 	}
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
@@ -111,8 +181,17 @@ func main() {
 		})
 	})
 
+	// Single-origin SPA hosting fallback: only API paths and non-GET requests
+	// keep the JSON 404, everything else serves the SPA shell.
 	r.NoRoute(func(c *gin.Context) {
-		c.HTML(404, "404.html", gin.H{})
+		if strings.HasPrefix(c.Request.URL.Path, "/v1") || c.Request.Method != http.MethodGet {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "Not found"})
+			return
+		}
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"ginBoilerplateVersion": "v3.0",
+			"goVersion":             runtime.Version(),
+		})
 	})
 
 	port := os.Getenv("PORT")

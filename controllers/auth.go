@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 )
 
 // AuthController ...
@@ -51,48 +51,60 @@ func (ctl AuthController) Refresh(c *gin.Context) {
 		return
 	}
 	//is token valid?
-	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
+	claims, ok := token.Claims.(jwt.MapClaims) //the token claims should conform to MapClaims
+	if !ok || !token.Valid {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
 		return
 	}
-	//Since token is valid, get the uuid:
-	claims, ok := token.Claims.(jwt.MapClaims) //the token claims should conform to MapClaims
-	if ok && token.Valid {
-		refreshUUID, ok := claims["refresh_uuid"].(string) //convert the interface to string
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
-			return
-		}
-		userID, err := strconv.ParseInt(fmt.Sprintf("%.f", claims["user_id"]), 10, 64)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
-			return
-		}
-		// Verify ownership and consume the previous refresh token atomically.
-		deleted, delErr := authModel.ConsumeRefreshAuth(refreshUUID, userID)
-		if delErr != nil || deleted == 0 { //if any goes wrong
-			c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
-			return
-		}
-
-		//Create new pairs of refresh and access tokens
-		ts, createErr := authModel.CreateToken(userID)
-		if createErr != nil {
-			c.JSON(http.StatusForbidden, gin.H{"message": "Invalid authorization, please login again"})
-			return
-		}
-		//save the tokens metadata to redis
-		saveErr := authModel.CreateAuth(userID, ts)
-		if saveErr != nil {
-			c.JSON(http.StatusForbidden, gin.H{"message": "Invalid authorization, please login again"})
-			return
-		}
-		tokens := map[string]string{
-			"access_token":  ts.AccessToken,
-			"refresh_token": ts.RefreshToken,
-		}
-		c.JSON(http.StatusOK, tokens)
-	} else {
+	refreshUUID, ok := claims["refresh_uuid"].(string)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
+		return
 	}
+	userIDClaim, ok := claims["user_id"].(string)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
+		return
+	}
+	userID, err := uuid.Parse(userIDClaim)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
+		return
+	}
+	// Verify ownership and consume the previous refresh token atomically.
+	deleted, delErr := authModel.ConsumeRefreshAuth(refreshUUID, userID)
+	if delErr != nil || deleted == 0 { //if any goes wrong
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
+		return
+	}
+
+	// Re-read the user through the platform pool: the role is never read back
+	// from the claims, the user must still exist and its tenant stay active.
+	row, readErr := userModel.OneWithTenant(userID)
+	if readErr != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
+		return
+	}
+	if row.Status != 1 {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid authorization, please login again"})
+		return
+	}
+
+	//Create new pairs of refresh and access tokens
+	ts, createErr := authModel.CreateToken(row.User.ID, row.User.TenantID, row.User.Role)
+	if createErr != nil {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Invalid authorization, please login again"})
+		return
+	}
+	//save the tokens metadata to redis
+	saveErr := authModel.CreateAuth(row.User.ID, row.User.TenantID, row.User.Role, ts)
+	if saveErr != nil {
+		c.JSON(http.StatusForbidden, gin.H{"message": "Invalid authorization, please login again"})
+		return
+	}
+	tokens := map[string]string{
+		"access_token":  ts.AccessToken,
+		"refresh_token": ts.RefreshToken,
+	}
+	c.JSON(http.StatusOK, tokens)
 }

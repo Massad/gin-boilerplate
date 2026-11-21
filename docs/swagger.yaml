@@ -35,6 +35,10 @@ definitions:
     type: object
   forms.RegisterForm:
     properties:
+      company:
+        maxLength: 60
+        minLength: 3
+        type: string
       email:
         type: string
       name:
@@ -46,9 +50,20 @@ definitions:
         minLength: 3
         type: string
     required:
+    - company
     - email
     - name
     - password
+    type: object
+  forms.TenantStatusForm:
+    properties:
+      status:
+        enum:
+        - 0
+        - 1
+        type: integer
+    required:
+    - status
     type: object
   forms.Token:
     properties:
@@ -64,6 +79,13 @@ definitions:
           $ref: '#/definitions/models.Result'
         type: array
     type: object
+  models.AllTenantResponse:
+    properties:
+      tenants:
+        items:
+          $ref: '#/definitions/models.Tenant'
+        type: array
+    type: object
   models.ArticleResponse:
     properties:
       content:
@@ -71,7 +93,7 @@ definitions:
       created_at:
         type: integer
       id:
-        type: integer
+        type: string
       title:
         type: string
       updated_at:
@@ -110,6 +132,26 @@ definitions:
       meta:
         $ref: '#/definitions/models.Meta'
     type: object
+  models.Tenant:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+      status:
+        type: integer
+    type: object
+  models.TenantPayload:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+    type: object
   models.Token:
     properties:
       access_token:
@@ -122,14 +164,20 @@ definitions:
       email:
         type: string
       id:
-        type: integer
+        type: string
       name:
+        type: string
+      role:
+        type: string
+      tenant_id:
         type: string
     type: object
   models.UserLoginResponse:
     properties:
       message:
         type: string
+      tenant:
+        $ref: '#/definitions/models.TenantPayload'
       token:
         $ref: '#/definitions/models.Token'
       user:
@@ -140,7 +188,7 @@ definitions:
       email:
         type: string
       id:
-        type: integer
+        type: string
       name:
         type: string
     type: object
@@ -162,6 +210,90 @@ info:
   title: Golang Gin Boilerplate
   version: "3.0"
 paths:
+  /admin/login:
+    post:
+      consumes:
+      - application/json
+      description: Login Admin example
+      parameters:
+      - description: Admin
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/forms.LoginForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AuthResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Login Admin example
+      tags:
+      - Admin
+  /admin/logout:
+    get:
+      description: Logout Admin example
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Logout Admin example
+      tags:
+      - Admin
+  /admin/tenants:
+    get:
+      description: List tenants for the platform backoffice
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AllTenantResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: List tenants (admin)
+      tags:
+      - Admin
+  /admin/tenants/{id}/status:
+    post:
+      consumes:
+      - application/json
+      description: Suspend or reactivate a tenant and log the audit line
+      parameters:
+      - description: Status
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/forms.TenantStatusForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Set tenant status (admin)
+      tags:
+      - Admin
   /article:
     post:
       consumes:
@@ -303,6 +435,23 @@ paths:
       summary: Download Invoice as PDF
       tags:
       - Invoice
+  /public/{slug}:
+    get:
+      description: Expose the public directory data of an active tenant
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Public tenant lookup by slug
+      tags:
+      - Public
   /token/refresh:
     post:
       consumes:

@@ -1,10 +1,11 @@
 package controllers
 
 import (
-	"strconv"
+	"errors"
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/models"
+	"github.com/google/uuid"
 
 	"net/http"
 
@@ -29,6 +30,7 @@ var articleModel = new(models.ArticleModel)
 // @Router /article [post]
 func (ctrl ArticleController) Create(c *gin.Context) {
 	userID := getUserID(c)
+	tenantID := getTenantID(c)
 
 	var form forms.CreateArticleForm
 
@@ -38,13 +40,13 @@ func (ctrl ArticleController) Create(c *gin.Context) {
 		return
 	}
 
-	id, err := articleModel.Create(userID, form)
+	id, err := articleModel.Create(c.Request.Context(), tenantID, userID, form)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Article could not be created"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Article created", "id": id})
+	c.JSON(http.StatusOK, gin.H{"message": "Article created", "id": id.String()})
 }
 
 // Get All Articles godoc
@@ -59,8 +61,9 @@ func (ctrl ArticleController) Create(c *gin.Context) {
 // @Router /articles [GET]
 func (ctrl ArticleController) All(c *gin.Context) {
 	userID := getUserID(c)
+	tenantID := getTenantID(c)
 
-	results, err := articleModel.All(userID)
+	results, err := articleModel.All(c.Request.Context(), tenantID, userID)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"Message": "Could not get articles"})
 		return
@@ -81,16 +84,17 @@ func (ctrl ArticleController) All(c *gin.Context) {
 // @Router /article/{id} [GET]
 func (ctrl ArticleController) One(c *gin.Context) {
 	userID := getUserID(c)
+	tenantID := getTenantID(c)
 
 	id := c.Param("id")
 
-	getID, err := strconv.ParseInt(id, 10, 64)
-	if getID == 0 || err != nil {
+	getID, err := uuid.Parse(id)
+	if err != nil || getID == uuid.Nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 		return
 	}
 
-	data, err := articleModel.One(userID, getID)
+	data, err := articleModel.One(c.Request.Context(), tenantID, userID, getID)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Article not found"})
 		return
@@ -112,11 +116,12 @@ func (ctrl ArticleController) One(c *gin.Context) {
 // @Router /article/{id} [PUT]
 func (ctrl ArticleController) Update(c *gin.Context) {
 	userID := getUserID(c)
+	tenantID := getTenantID(c)
 
 	id := c.Param("id")
 
-	getID, err := strconv.ParseInt(id, 10, 64)
-	if getID == 0 || err != nil {
+	getID, err := uuid.Parse(id)
+	if err != nil || getID == uuid.Nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 		return
 	}
@@ -129,8 +134,12 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 		return
 	}
 
-	err = articleModel.Update(userID, getID, form)
+	err = articleModel.Update(c.Request.Context(), tenantID, userID, getID, form)
 	if err != nil {
+		if errors.Is(err, models.ErrNotFound) {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Article not found"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"Message": "Article could not be updated"})
 		return
 	}
@@ -151,17 +160,22 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 // @Router /article/{id} [DELETE]
 func (ctrl ArticleController) Delete(c *gin.Context) {
 	userID := getUserID(c)
+	tenantID := getTenantID(c)
 
 	id := c.Param("id")
 
-	getID, err := strconv.ParseInt(id, 10, 64)
-	if getID == 0 || err != nil {
+	getID, err := uuid.Parse(id)
+	if err != nil || getID == uuid.Nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 		return
 	}
 
-	err = articleModel.Delete(userID, getID)
+	err = articleModel.Delete(c.Request.Context(), tenantID, userID, getID)
 	if err != nil {
+		if errors.Is(err, models.ErrNotFound) {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Article not found"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"Message": "Article could not be deleted"})
 		return
 	}

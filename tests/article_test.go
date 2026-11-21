@@ -5,24 +5,32 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/Massad/gin-boilerplate/controllers"
 	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
+	pgdb "github.com/Massad/gin-boilerplate/internal/db"
 	"github.com/Massad/gin-boilerplate/invoice"
 	"github.com/Massad/gin-boilerplate/middleware"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"github.com/stretchr/testify/assert"
+	"github.com/google/uuid"
 )
 
 func SetupRouter() *gin.Engine {
@@ -60,6 +68,22 @@ func SetupRouter() *gin.Engine {
 
 		v1.GET("/invoice", inv.Preview)
 		v1.GET("/invoice/download", inv.Download)
+
+		/*** START ADMIN ***/
+		admin := new(controllers.AdminController)
+
+		v1.POST("/admin/login", admin.Login)
+		adminAPI := v1.Group("/admin", middleware.AdminAuth())
+		{
+			adminAPI.GET("/logout", admin.Logout)
+			adminAPI.GET("/tenants", admin.Tenants)
+			adminAPI.POST("/tenants/:id/status", admin.SetTenantStatus)
+		}
+
+		/*** START PUBLIC ***/
+		pub := new(controllers.PublicController)
+
+		v1.GET("/public/:slug", pub.One)
 	}
 
 	r.LoadHTMLGlob("../public/html/*")
@@ -72,6 +96,39 @@ func main() {
 	r.Run()
 }
 
+// doRequest runs one request against the router and returns the recorder.
+func doRequest(r *gin.Engine, method, path string, body interface{}, token string) *httptest.ResponseRecorder {
+	var reader io.Reader
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			panic(err)
+		}
+		reader = bytes.NewBuffer(data)
+	}
+	req, err := http.NewRequest(method, path, reader)
+	if err != nil {
+		panic(err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	return resp
+}
+
+// decode unmarshals a JSON response body into v.
+func decode(t *testing.T, resp *httptest.ResponseRecorder, v interface{}) {
+	t.Helper()
+	if err := json.Unmarshal(resp.Body.Bytes(), v); err != nil {
+		t.Fatal(err)
+	}
+}
+
 var loginCookie string
 
 var testEmail = "test-gin-boilerplate@test.com"
@@ -80,7 +137,23 @@ var testPassword = "123456"
 var accessToken string
 var refreshToken string
 
-var articleID int
+var articleID string
+
+// Tenant A (owner of the first registered tenant).
+var tenantSlugA string
+var tenantIDA string
+
+// Tenant B (second tenant used for cross-tenant isolation checks).
+var testEmailB = "tenant-b-gin-boilerplate@test.com"
+var tenantSlugB string
+var tenantIDB string
+var accessTokenB string
+var refreshTokenB string
+
+// Platform backoffice admin seeded once by TestIntDB.
+var testAdminEmail = "platform-backoffice@test.com"
+var testAdminPassword = "admin-strong-password"
+var adminAccessToken string
 
 /**
 * TestIntDB
@@ -96,38 +169,107 @@ func TestIntDB(t *testing.T) {
 		log.Fatal("Error loading .env file, please create one in the root directory")
 	}
 
-	db.Init()
+	ctx := context.Background()
+	if err := pgdb.InitTenant(ctx, os.Getenv); err != nil {
+		log.Fatal(err)
+	}
+	if err := pgdb.InitAdmin(ctx, os.Getenv); err != nil {
+		log.Fatal(err)
+	}
 	db.InitRedis(1)
+
+	// Seed the platform backoffice admin (password hashed in Go).
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(testAdminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pgdb.AdminStore().CreateAdmin(ctx, pgdb.CreateAdminParams{
+		Email:    testAdminEmail,
+		Password: string(passwordHash),
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 /**
 * TestRegister
-* Test user registration
+* Test user registration: the tenant is created with its owner
 *
 * Must return response code 200
  */
 func TestRegister(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var registerForm forms.RegisterForm
-
-	registerForm.Name = "testing"
-	registerForm.Email = testEmail
-	registerForm.Password = testPassword
-
-	data, _ := json.Marshal(registerForm)
-
-	req, err := http.NewRequest("POST", "/v1/user/register", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		fmt.Println(err)
+	registerForm := forms.RegisterForm{
+		Name:     "testing",
+		Email:    testEmail,
+		Password: testPassword,
+		Company:  "Test Company",
 	}
 
-	resp := httptest.NewRecorder()
-
-	testRouter.ServeHTTP(resp, req)
+	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
 	assert.Equal(t, http.StatusOK, resp.Code)
+
+	var res struct {
+		Message string `json:"message"`
+		User    struct {
+			ID    string `json:"id"`
+			Email string `json:"email"`
+			Role  string `json:"role"`
+		} `json:"user"`
+		Tenant struct {
+			ID   string `json:"id"`
+			Slug string `json:"slug"`
+			Name string `json:"name"`
+		} `json:"tenant"`
+	}
+	decode(t, resp, &res)
+
+	tenantIDA = res.Tenant.ID
+	tenantSlugA = res.Tenant.Slug
+
+	assert.Equal(t, "test-company", res.Tenant.Slug)
+	assert.Equal(t, "owner", res.User.Role)
+}
+
+/**
+* TestRegisterReservedSlug
+* A company mapping to a reserved route root is rejected
+*
+* Must return response code 406
+ */
+func TestRegisterReservedSlug(t *testing.T) {
+	testRouter := SetupRouter()
+
+	registerForm := forms.RegisterForm{
+		Name:     "testing",
+		Email:    "reserved-slug@test.com",
+		Password: testPassword,
+		Company:  "Admin",
+	}
+
+	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
+	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
+}
+
+/**
+* TestRegisterDuplicateEmail
+* The email is globally unique across tenants
+*
+* Must return response code 406
+ */
+func TestRegisterDuplicateEmail(t *testing.T) {
+	testRouter := SetupRouter()
+
+	registerForm := forms.RegisterForm{
+		Name:     "testing",
+		Email:    testEmail,
+		Password: testPassword,
+		Company:  "Another Company",
+	}
+
+	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
+	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -139,79 +281,77 @@ func TestRegister(t *testing.T) {
 func TestRegisterInvalidEmail(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var registerForm forms.RegisterForm
-
-	registerForm.Name = "testing"
-	registerForm.Email = "invalid@email"
-	registerForm.Password = testPassword
-
-	data, _ := json.Marshal(registerForm)
-
-	req, err := http.NewRequest("POST", "/v1/user/register", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		fmt.Println(err)
+	registerForm := forms.RegisterForm{
+		Name:     "testing",
+		Email:    "invalid@email",
+		Password: testPassword,
+		Company:  "Test Company",
 	}
 
-	resp := httptest.NewRecorder()
-
-	testRouter.ServeHTTP(resp, req)
+	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
 	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
 * TestLogin
-* Test user login
-* and get the access_token and refresh_token stored
+* Test user login: the response carries the tenant and the role
+* and the access/refresh tokens are stored
 *
 * Must return response code 200
  */
 func TestLogin(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var loginForm forms.LoginForm
-
-	loginForm.Email = testEmail
-	loginForm.Password = testPassword
-
-	data, _ := json.Marshal(loginForm)
-
-	req, err := http.NewRequest("POST", "/v1/user/login", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		fmt.Println(err)
+	loginForm := forms.LoginForm{
+		Email:    testEmail,
+		Password: testPassword,
 	}
 
-	resp := httptest.NewRecorder()
-
-	testRouter.ServeHTTP(resp, req)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
 
 	var res struct {
-		Message string `json:"message"`
-		User    struct {
-			CreatedAt int64  `json:"created_at"`
-			Email     string `json:"email"`
-			ID        int64  `json:"id"`
-			Name      string `json:"name"`
-			UpdatedAt int64  `json:"updated_at"`
+		User struct {
+			ID       string `json:"id"`
+			Role     string `json:"role"`
+			TenantID string `json:"tenant_id"`
 		} `json:"user"`
+		Tenant struct {
+			ID   string `json:"id"`
+			Slug string `json:"slug"`
+			Name string `json:"name"`
+		} `json:"tenant"`
 		Token struct {
 			AccessToken  string `json:"access_token"`
 			RefreshToken string `json:"refresh_token"`
 		} `json:"token"`
 	}
-	json.Unmarshal(body, &res)
+	decode(t, resp, &res)
 
 	accessToken = res.Token.AccessToken
 	refreshToken = res.Token.RefreshToken
 
+	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Equal(t, tenantSlugA, res.Tenant.Slug)
+	assert.Equal(t, tenantIDA, res.Tenant.ID)
+	assert.Equal(t, "owner", res.User.Role)
+	assert.Equal(t, tenantIDA, res.User.TenantID)
+}
+
+/**
+* TestLoginUppercaseEmail
+* The stored email is normalized: a case variant logs in too
+*
+* Must return response code 200
+ */
+func TestLoginUppercaseEmail(t *testing.T) {
+	testRouter := SetupRouter()
+
+	loginForm := forms.LoginForm{
+		Email:    strings.ToUpper(testEmail),
+		Password: testPassword,
+	}
+
+	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
 	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
@@ -224,24 +364,12 @@ func TestLogin(t *testing.T) {
 func TestInvalidLogin(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var loginForm forms.LoginForm
-
-	loginForm.Email = "wrong@email.com"
-	loginForm.Password = testPassword
-
-	data, _ := json.Marshal(loginForm)
-
-	req, err := http.NewRequest("POST", "/v1/user/login", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		fmt.Println(err)
+	loginForm := forms.LoginForm{
+		Email:    "wrong@email.com",
+		Password: testPassword,
 	}
 
-	resp := httptest.NewRecorder()
-
-	testRouter.ServeHTTP(resp, req)
-
+	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
 	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
@@ -254,34 +382,18 @@ func TestInvalidLogin(t *testing.T) {
 func TestCreateArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var form forms.CreateArticleForm
-
-	form.Title = "Testing article title"
-	form.Content = "Testing article content"
-
-	data, _ := json.Marshal(form)
-
-	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
-
-	if err != nil {
-		fmt.Println(err)
+	form := forms.CreateArticleForm{
+		Title:   "Testing article title",
+		Content: "Testing article content",
 	}
 
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	resp := doRequest(testRouter, "POST", "/v1/article", form, accessToken)
 
 	var res struct {
-		Status int
-		ID     int
+		Message string `json:"message"`
+		ID      string `json:"id"`
 	}
-	json.Unmarshal(body, &res)
+	decode(t, resp, &res)
 
 	articleID = res.ID
 
@@ -289,32 +401,38 @@ func TestCreateArticle(t *testing.T) {
 }
 
 /**
-* TestCreateInvalidArticle
-* Test article invalid creation
+* TestListArticles
+* Test listing the tenant articles
 *
-* Must return response code 406
+* Must return response code 200 and contain the created article
  */
-func TestCreateInvalidArticle(t *testing.T) {
+func TestListArticles(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var form forms.CreateArticleForm
+	resp := doRequest(testRouter, "GET", "/v1/articles", nil, accessToken)
 
-	form.Title = "Testing article title"
-
-	data, _ := json.Marshal(form)
-
-	req, err := http.NewRequest("POST", "/v1/article", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
-
-	if err != nil {
-		fmt.Println(err)
+	var res struct {
+		Results []struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+			Meta struct {
+				Total int `json:"total"`
+			} `json:"meta"`
+		} `json:"results"`
 	}
+	decode(t, resp, &res)
 
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
-	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
+	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Len(t, res.Results, 1)
+	assert.Equal(t, 1, res.Results[0].Meta.Total)
+	var found bool
+	for _, item := range res.Results[0].Data {
+		if item.ID == articleID {
+			found = true
+		}
+	}
+	assert.True(t, found, "list must contain the created article")
 }
 
 /**
@@ -326,17 +444,19 @@ func TestCreateInvalidArticle(t *testing.T) {
 func TestGetArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("/v1/article/%d", articleID), nil)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
+	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, accessToken)
 	assert.Equal(t, http.StatusOK, resp.Code)
+
+	var res struct {
+		Data struct {
+			ID   string `json:"id"`
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+	decode(t, resp, &res)
+	assert.Equal(t, articleID, res.Data.ID)
 }
 
 /**
@@ -348,16 +468,7 @@ func TestGetArticle(t *testing.T) {
 func TestGetInvalidArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", "/v1/article/invalid", nil)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
+	resp := doRequest(testRouter, "GET", "/v1/article/invalid", nil, accessToken)
 	assert.Equal(t, http.StatusNotFound, resp.Code)
 }
 
@@ -370,16 +481,7 @@ func TestGetInvalidArticle(t *testing.T) {
 func TestGetArticleNotLoggedin(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("/v1/article/%d", articleID), nil)
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
+	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, "")
 	assert.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
@@ -392,17 +494,7 @@ func TestGetArticleNotLoggedin(t *testing.T) {
 func TestGetArticleUnauthorized(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("/v1/article/%d", articleID), nil)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", "abc123"))
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
+	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, "abc123")
 	assert.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
@@ -415,51 +507,221 @@ func TestGetArticleUnauthorized(t *testing.T) {
 func TestUpdateArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var form forms.CreateArticleForm
-
-	form.Title = "Testing new article title"
-	form.Content = "Testing new article content"
-
-	data, _ := json.Marshal(form)
-
-	url := fmt.Sprintf("/v1/article/%d", articleID)
-
-	req, err := http.NewRequest("PUT", url, bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
-
-	if err != nil {
-		fmt.Println(err)
+	form := forms.CreateArticleForm{
+		Title:   "Testing new article title",
+		Content: "Testing new article content",
 	}
 
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
+	resp := doRequest(testRouter, "PUT", fmt.Sprintf("/v1/article/%s", articleID), form, accessToken)
 	assert.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
-* TestDeleteArticle
-* Test deleting an article
+* TestCrossTenantIsolation
+* Tenant B can neither read, update nor delete the tenant A article; its own
+* list stays empty; and it creates and reads its own article.
+ */
+func TestCrossTenantIsolation(t *testing.T) {
+	testRouter := SetupRouter()
+
+	// Register tenant B.
+	registerForm := forms.RegisterForm{
+		Name:     "testingb",
+		Email:    testEmailB,
+		Password: testPassword,
+		Company:  "Second Company",
+	}
+	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
+	assert.Equal(t, http.StatusOK, resp.Code)
+	var registration struct {
+		Tenant struct {
+			ID   string `json:"id"`
+			Slug string `json:"slug"`
+		} `json:"tenant"`
+	}
+	decode(t, resp, &registration)
+	tenantIDB = registration.Tenant.ID
+	tenantSlugB = registration.Tenant.Slug
+	assert.NotEmpty(t, tenantIDB)
+
+	// Login tenant B.
+	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
+	resp = doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
+	var loginRes struct {
+		User struct {
+			TenantID string `json:"tenant_id"`
+		} `json:"user"`
+		Tenant struct {
+			Slug string `json:"slug"`
+		} `json:"tenant"`
+		Token struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+		} `json:"token"`
+	}
+	decode(t, resp, &loginRes)
+	accessTokenB = loginRes.Token.AccessToken
+	refreshTokenB = loginRes.Token.RefreshToken
+	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Equal(t, tenantIDB, loginRes.User.TenantID)
+	assert.Equal(t, "second-company", loginRes.Tenant.Slug)
+
+	// A's article is invisible for B (RLS: the row does not exist).
+	assert.Equal(t, http.StatusNotFound, doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, accessTokenB).Code)
+	assert.Equal(t, http.StatusNotFound, doRequest(testRouter, "PUT", fmt.Sprintf("/v1/article/%s", articleID), forms.CreateArticleForm{Title: "Stolen title", Content: "Stolen content"}, accessTokenB).Code)
+	assert.Equal(t, http.StatusNotFound, doRequest(testRouter, "DELETE", fmt.Sprintf("/v1/article/%s", articleID), nil, accessTokenB).Code)
+
+	// B's own list is empty.
+	var listRes struct {
+		Results []struct {
+			Data []string `json:"data"`
+			Meta struct {
+				Total int `json:"total"`
+			} `json:"meta"`
+		} `json:"results"`
+	}
+	decode(t, doRequest(testRouter, "GET", "/v1/articles", nil, accessTokenB), &listRes)
+	assert.Equal(t, 0, listRes.Results[0].Meta.Total)
+	assert.Len(t, listRes.Results[0].Data, 0)
+}
+
+/**
+* TestGetArticleB
+* Tenant B reads its own article normally
 *
 * Must return response code 200
  */
-func TestDeleteArticle(t *testing.T) {
+func TestGetArticleB(t *testing.T) {
 	testRouter := SetupRouter()
 
-	url := fmt.Sprintf("/v1/article/%d", articleID)
-
-	req, err := http.NewRequest("DELETE", url, nil)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
-
-	if err != nil {
-		fmt.Println(err)
+	form := forms.CreateArticleForm{
+		Title:   "B article title",
+		Content: "B article content",
 	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
+	resp := doRequest(testRouter, "POST", "/v1/article", form, accessTokenB)
 	assert.Equal(t, http.StatusOK, resp.Code)
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	decode(t, resp, &created)
+
+	resp = doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", created.ID), nil, accessTokenB)
+	assert.Equal(t, http.StatusOK, resp.Code)
+}
+
+/**
+* TestRLSFailClosed
+* Raw SQL against the tenant pool proves the row level security is enforced:
+* without a tenant context every tenant row is invisible, a wrong tenant sees
+* nothing, and a cross tenant insert is rejected.
+ */
+func TestRLSFailClosed(t *testing.T) {
+	ctx := context.Background()
+	pool := pgdb.TenantStore().Pool
+
+	// 1. No tenant context: the policies close everything.
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 0, count, "article rows must be invisible without tenant context")
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM "user"`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 0, count, "user rows must be invisible without tenant context")
+	_ = tx.Rollback(ctx)
+
+	// 2. A wrong tenant context: still nothing.
+	tx, err = pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, uuid.NewString()); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 0, count, "article rows must be invisible for a foreign tenant")
+	_ = tx.Rollback(ctx)
+
+	// 3. Cross tenant insert is rejected.
+	tx, err = pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDB); err != nil {
+		t.Fatal(err)
+	}
+	_, err = tx.Exec(ctx,
+		`INSERT INTO article (tenant_id, user_id, title, content)
+		 SELECT $1, b.id, 'stolen', 'stolen content'
+		 FROM "user" b
+		 WHERE b.email = $2`,
+		tenantIDA, testEmailB)
+	// The insert targets tenant A while the RLS context is tenant B: the
+	// policy must reject the violating row with 42501.
+	if err == nil {
+		t.Fatal("cross-tenant insert unexpectedly succeeded (RLS WITH CHECK failed)")
+	}
+	pgErr, ok := err.(*pgconn.PgError)
+	if !ok || pgErr.Code != "42501" {
+		t.Fatalf("expected RLS violation 42501, got %v", err)
+	}
+	_ = tx.Rollback(ctx)
+
+	// 4. Within its own tenant context, tenant B sees its rows and can insert.
+	tx, err = pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDB); err != nil {
+		t.Fatal(err)
+	}
+	var bCount int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM "user"`).Scan(&bCount); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, bCount, "tenant B sees its own user inside its context")
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&bCount); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, bCount, "tenant B sees exactly its own article")
+	_ = tx.Rollback(ctx)
+}
+
+/**
+* TestOneOwnerConstraint
+* The partial unique index guarantees a single owner per tenant.
+ */
+func TestOneOwnerConstraint(t *testing.T) {
+	ctx := context.Background()
+	pool := pgdb.TenantStore().Pool
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDA); err != nil {
+		t.Fatal(err)
+	}
+	_, err = tx.Exec(ctx,
+		`INSERT INTO "user" (email, password, name, tenant_id, role)
+		 VALUES ($1, $2, $3, $4, 'owner')`,
+		"second-owner@test.com", "irrelevant-hash", "Second Owner", tenantIDA)
+	if err == nil {
+		t.Fatal("second owner unexpectedly inserted")
+	}
+	pgErr, ok := err.(*pgconn.PgError)
+	if !ok || pgErr.Code != "23505" {
+		t.Fatalf("expected unique violation 23505, got %v", err)
+	}
 }
 
 /**
@@ -471,21 +733,20 @@ func TestDeleteArticle(t *testing.T) {
 func TestRefreshToken(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var tokenForm forms.Token
+	tokenForm := forms.Token{RefreshToken: refreshToken}
 
-	tokenForm.RefreshToken = refreshToken
+	resp := doRequest(testRouter, "POST", "/v1/token/refresh", tokenForm, "")
 
-	data, _ := json.Marshal(tokenForm)
-
-	req, err := http.NewRequest("POST", "/v1/token/refresh", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		fmt.Println(err)
+	var res struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
 	}
+	decode(t, resp, &res)
 
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
+	// The original refresh token is kept as the replay subject: the refreshed
+	// pair is a different session.
+	assert.NotEmpty(t, res.AccessToken)
+	assert.NotEmpty(t, res.RefreshToken)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
 }
@@ -499,28 +760,15 @@ func TestRefreshToken(t *testing.T) {
 func TestInvalidRefreshToken(t *testing.T) {
 	testRouter := SetupRouter()
 
-	var tokenForm forms.Token
-
 	//Since we didn't update it in the test before - this will not be valid anymore
-	tokenForm.RefreshToken = refreshToken
+	tokenForm := forms.Token{RefreshToken: refreshToken}
 
-	data, _ := json.Marshal(tokenForm)
-
-	req, err := http.NewRequest("POST", "/v1/token/refresh", bytes.NewBufferString(string(data)))
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
-
+	resp := doRequest(testRouter, "POST", "/v1/token/refresh", tokenForm, "")
 	assert.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
-* TestUserSignout
+* TestUserLogout
 * Test logout a user
 *
 * Must return response code 200
@@ -528,17 +776,189 @@ func TestInvalidRefreshToken(t *testing.T) {
 func TestUserLogout(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", "/v1/user/logout", nil)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer: %s", accessToken))
+	resp := doRequest(testRouter, "GET", "/v1/user/logout", nil, accessToken)
+	assert.Equal(t, http.StatusOK, resp.Code)
+}
 
-	if err != nil {
-		fmt.Println(err)
+/**
+* TestAdminLogin
+* Login to the platform backoffice with the seeded admin_user
+*
+* Must return response code 200
+ */
+func TestAdminLogin(t *testing.T) {
+	testRouter := SetupRouter()
+
+	loginForm := forms.LoginForm{Email: testAdminEmail, Password: testAdminPassword}
+
+	resp := doRequest(testRouter, "POST", "/v1/admin/login", loginForm, "")
+
+	var res struct {
+		Token struct {
+			AccessToken string `json:"access_token"`
+		} `json:"token"`
 	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
+	decode(t, resp, &res)
+	adminAccessToken = res.Token.AccessToken
 
 	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.NotEmpty(t, adminAccessToken)
+}
+
+/**
+* TestAdminLoginWithUserCredentials
+* A tenant user cannot log into the backoffice
+*
+* Must return response code 406
+ */
+func TestAdminLoginWithUserCredentials(t *testing.T) {
+	testRouter := SetupRouter()
+
+	loginForm := forms.LoginForm{Email: testEmail, Password: testPassword}
+
+	resp := doRequest(testRouter, "POST", "/v1/admin/login", loginForm, "")
+	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
+}
+
+/**
+* TestAdminTenants
+* The backoffice lists both tenants
+*
+* Must return response code 200
+ */
+func TestAdminTenants(t *testing.T) {
+	testRouter := SetupRouter()
+
+	resp := doRequest(testRouter, "GET", "/v1/admin/tenants", nil, adminAccessToken)
+
+	var res struct {
+		Tenants []struct {
+			ID   string `json:"id"`
+			Slug string `json:"slug"`
+		} `json:"tenants"`
+	}
+	decode(t, resp, &res)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+	slugs := map[string]bool{}
+	for _, tenant := range res.Tenants {
+		slugs[tenant.Slug] = true
+	}
+	assert.True(t, slugs[tenantSlugA])
+	assert.True(t, slugs[tenantSlugB])
+}
+
+/**
+* TestAdminTokenOnTenantRoute
+* A superadmin token must not reach tenant routes
+*
+* Must return response code 401
+ */
+func TestAdminTokenOnTenantRoute(t *testing.T) {
+	testRouter := SetupRouter()
+
+	resp := doRequest(testRouter, "GET", "/v1/articles", nil, adminAccessToken)
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+}
+
+/**
+* TestUserTokenOnAdminRoute
+* A tenant token must not reach the backoffice
+*
+* Must return response code 401
+ */
+func TestUserTokenOnAdminRoute(t *testing.T) {
+	testRouter := SetupRouter()
+
+	resp := doRequest(testRouter, "GET", "/v1/admin/tenants", nil, accessTokenB)
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+}
+
+/**
+* TestAdminSuspendTenant
+* The backoffice suspends tenant B
+*
+* Must return response code 200
+ */
+func TestAdminSuspendTenant(t *testing.T) {
+	testRouter := SetupRouter()
+
+	body := map[string]int16{"status": 0}
+	resp := doRequest(testRouter, "POST", fmt.Sprintf("/v1/admin/tenants/%s/status", tenantIDB), body, adminAccessToken)
+	assert.Equal(t, http.StatusOK, resp.Code)
+}
+
+/**
+* TestSuspendedTenantLogin
+* A suspended tenant rejects logins
+*
+* Must return response code 403
+ */
+func TestSuspendedTenantLogin(t *testing.T) {
+	testRouter := SetupRouter()
+
+	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
+	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
+	assert.Equal(t, http.StatusForbidden, resp.Code)
+}
+
+/**
+* TestSuspendedTenantRefresh
+* A suspended tenant rejects refreshes
+*
+* Must return response code 401
+ */
+func TestSuspendedTenantRefresh(t *testing.T) {
+	testRouter := SetupRouter()
+
+	tokenForm := forms.Token{RefreshToken: refreshTokenB}
+	resp := doRequest(testRouter, "POST", "/v1/token/refresh", tokenForm, "")
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+}
+
+/**
+* TestAdminReactivateTenant
+* The backoffice reactivates tenant B: logins work again
+*
+* Must return response code 200
+ */
+func TestAdminReactivateTenant(t *testing.T) {
+	testRouter := SetupRouter()
+
+	body := map[string]int16{"status": 1}
+	resp := doRequest(testRouter, "POST", fmt.Sprintf("/v1/admin/tenants/%s/status", tenantIDB), body, adminAccessToken)
+	assert.Equal(t, http.StatusOK, resp.Code)
+
+	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
+	resp = doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
+	assert.Equal(t, http.StatusOK, resp.Code)
+}
+
+/**
+* TestPublicTenant
+* The public directory exposes an active tenant and 404s unknown or
+* reserved slugs
+ */
+func TestPublicTenant(t *testing.T) {
+	testRouter := SetupRouter()
+
+	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/public/%s", tenantSlugB), nil, "")
+	assert.Equal(t, http.StatusOK, resp.Code)
+	var res struct {
+		Tenant struct {
+			ID   string `json:"id"`
+			Slug string `json:"slug"`
+		} `json:"tenant"`
+	}
+	decode(t, resp, &res)
+	assert.Equal(t, tenantSlugB, res.Tenant.Slug)
+	assert.Equal(t, tenantIDB, res.Tenant.ID)
+
+	resp = doRequest(testRouter, "GET", "/v1/public/this-slug-does-not-exist", nil, "")
+	assert.Equal(t, http.StatusNotFound, resp.Code)
+
+	resp = doRequest(testRouter, "GET", "/v1/public/admin", nil, "")
+	assert.Equal(t, http.StatusNotFound, resp.Code)
 }
 
 /**
@@ -550,13 +970,7 @@ func TestUserLogout(t *testing.T) {
 func TestInvoicePreview(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", "/v1/invoice", nil)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
+	resp := doRequest(testRouter, "GET", "/v1/invoice", nil, "")
 
 	assert.Equal(t, http.StatusOK, resp.Code)
 	assert.Contains(t, resp.Header().Get("Content-Type"), "text/html")
@@ -573,13 +987,7 @@ func TestInvoicePreview(t *testing.T) {
 func TestInvoiceDownload(t *testing.T) {
 	testRouter := SetupRouter()
 
-	req, err := http.NewRequest("GET", "/v1/invoice/download", nil)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	resp := httptest.NewRecorder()
-	testRouter.ServeHTTP(resp, req)
+	resp := doRequest(testRouter, "GET", "/v1/invoice/download", nil, "")
 
 	assert.Equal(t, http.StatusOK, resp.Code)
 	assert.Equal(t, "application/pdf", resp.Header().Get("Content-Type"))
@@ -588,15 +996,54 @@ func TestInvoiceDownload(t *testing.T) {
 }
 
 /**
+* TestAdminLogout
+* The admin session is revoked immediately (no refresh)
+*
+* Must return response code 200, then the token is dead.
+ */
+func TestAdminLogout(t *testing.T) {
+	testRouter := SetupRouter()
+
+	resp := doRequest(testRouter, "GET", "/v1/admin/logout", nil, adminAccessToken)
+	assert.Equal(t, http.StatusOK, resp.Code)
+
+	resp = doRequest(testRouter, "GET", "/v1/admin/tenants", nil, adminAccessToken)
+	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+}
+
+/**
 * TestCleanUp
-* Deletes the created user with it's articles
+* Deletes the tenants (cascading to users and articles) and the test admin,
+* then flushes the test session keys.
 *
 * Must pass
  */
 func TestCleanUp(t *testing.T) {
-	var err error
-	_, err = db.GetDB().Exec("DELETE FROM public.user WHERE email=$1", testEmail)
-	if err != nil {
+	ctx := context.Background()
+
+	if _, err := pgdb.AdminStore().Pool.Exec(ctx, "DELETE FROM public.tenant"); err != nil {
 		t.Error(err)
 	}
+	if _, err := pgdb.AdminStore().Pool.Exec(ctx, "DELETE FROM public.admin_user WHERE email=$1", testAdminEmail); err != nil {
+		t.Error(err)
+	}
+
+	// Flush this suite's Redis keys: tenant session index sets and admin keys.
+	if indexKeys, err := db.GetRedis().Keys("user_sessions:*").Result(); err == nil {
+		for _, indexKey := range indexKeys {
+			if members, err := db.GetRedis().SMembers(indexKey).Result(); err == nil {
+				if len(members) > 0 {
+					db.GetRedis().Del(members...)
+				}
+			}
+			db.GetRedis().Del(indexKey)
+		}
+	}
+	if keys, err := db.GetRedis().Keys("admin:*").Result(); err == nil && len(keys) > 0 {
+		db.GetRedis().Del(keys...)
+	}
+	db.GetRedis().Del(accessTokenB, refreshTokenB)
+
+	// Let the environment settle before the process exits.
+	_ = time.Now()
 }
