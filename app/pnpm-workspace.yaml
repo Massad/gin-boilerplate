@@ -1,0 +1,2 @@
+minimumReleaseAgeExclude:
+  - '@hookform/resolvers@7.0.8'
