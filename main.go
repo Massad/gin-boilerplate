@@ -73,6 +73,23 @@ func runCreateAdmin(ctx context.Context, getenv func(string) string, email, pass
 	return nil
 }
 
+// spaIndexPath is the built SPA shell served single-origin by this binary.
+const spaIndexPath = "./app/dist/index.html"
+
+// serveSPAIndex serves the built SPA shell with no-cache semantics, falling
+// back to the demo template when the frontend build is absent.
+func serveSPAIndex(c *gin.Context) {
+	if _, err := os.Stat(spaIndexPath); err != nil {
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"ginBoilerplateVersion": "v3.0",
+			"goVersion":             runtime.Version(),
+		})
+		return
+	}
+	c.Header("Cache-Control", "no-cache")
+	c.File(spaIndexPath)
+}
+
 func main() {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -174,12 +191,17 @@ func main() {
 
 	r.Static("/public", "./public")
 
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", gin.H{
-			"ginBoilerplateVersion": "v3.0",
-			"goVersion":             runtime.Version(),
-		})
+	// Hashed SPA assets are immutable: a new build ships new filenames.
+	assets := r.Group("/assets", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		c.Next()
 	})
+	assets.Static("/", "./app/dist/assets")
+
+	// The SPA shell is served with no-cache semantics. When the frontend build
+	// is absent, the demo template keeps the binary fully functional (the Go
+	// CI smoke test relies on that fallback).
+	r.GET("/", serveSPAIndex)
 
 	// Single-origin SPA hosting fallback: only API paths and non-GET requests
 	// keep the JSON 404, everything else serves the SPA shell.
@@ -188,10 +210,7 @@ func main() {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"message": "Not found"})
 			return
 		}
-		c.HTML(http.StatusOK, "index.html", gin.H{
-			"ginBoilerplateVersion": "v3.0",
-			"goVersion":             runtime.Version(),
-		})
+		serveSPAIndex(c)
 	})
 
 	port := os.Getenv("PORT")
