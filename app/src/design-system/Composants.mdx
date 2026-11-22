@@ -1,0 +1,67 @@
+import { Meta, Story } from "@storybook/addon-docs/blocks"
+import * as Boutons from "./boutons.stories"
+import * as Champs from "./champs.stories"
+import * as Badges from "./badges.stories"
+import * as Navigation from "./navigation.stories"
+import * as Donnees from "./donnees.stories"
+import * as Surcouches from "./surcouches.stories"
+
+<Meta title="Design System/Composants" />
+
+# Composants
+
+Portage des sections 04 à 09 du design-system Atrium (Open Design) : chaque spécimen
+est le composant réel, extrait des pages — les mêmes classes, les mêmes tokens
+`--od-*` de `src/index.css`, les mêmes états. Le CSS de référence vit dans
+`src/design-system/atrium.css`, les composants React dans `src/design-system/components/`.
+
+## Boutons
+
+Deux variantes seulement. Le bouton primaire est noir et réservé à l'action décisive
+de l'écran ; le secondaire est neutre.
+
+<Story of={Boutons.Variantes} />
+<Story of={Boutons.Etats} />
+
+## Champs de formulaire
+
+Étiquette au-dessus du champ, aide en dessous, erreur en rouge sous le champ
+invalide.
+
+<Story of={Champs.ChampTexte} />
+<Story of={Champs.MotDePasse} />
+<Story of={Champs.ListesEtZoneDeTexte} />
+<Story of={Champs.EtatInvalideEtCases} />
+<Story of={Champs.BanniereErreur} />
+
+## Badges &amp; statuts
+
+Les pastilles qualifient un état, jamais une action.
+
+<Story of={Badges.Variantes} />
+<Story of={Badges.Usage} />
+
+## Navigation
+
+Rail latéral, fil d'Ariane, sélecteur d'organisation et onglets partagent la même
+grisaille : le noir ne sert qu'à l'élément courant.
+
+<Story of={Navigation.RailLateral} />
+<Story of={Navigation.FilArianeEtSelecteur} />
+<Story of={Navigation.Onglets} />
+
+## Données &amp; tableaux
+
+Les indicateurs résument un périmètre avant le détail. Le tri, la sélection et la
+pagination sont annoncés par des attributs, jamais par une image.
+
+<Story of={Donnees.Indicateurs} />
+<Story of={Donnees.TableauDesMembres} />
+
+## Surcouches
+
+Trois couches au-dessus du document : le tiroir latéral pour l'édition, la modale
+pour la confirmation courte, la notification pour le retour d'action.
+
+<Story of={Surcouches.OuvrirLesCouches} />
+<Story of={Surcouches.ModeleNotification} />
