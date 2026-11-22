@@ -1,12 +1,30 @@
+## WINDOWS: make (3.81) falls back to cmd.exe and cannot run POSIX recipes
+## (mkdir -p, GOBIN= prefix, quoted paths). Route recipes through Git for
+## Windows' sh unless the caller overrides SHELL. No-op on Unix.
+ifeq ($(OS),Windows_NT)
+ifeq ($(origin SHELL),default)
+SHELL := C:/Program Files/Git/bin/sh.exe
+endif
+endif
+
 ## RUN APPLICATION
 run:
 	@echo -e "🚀 Running the application..."
-	@go run *.go
+	@go run .
 
 ## RUN TESTS
+## - Sources .env first (set -a exports the sourced assignments) so the tagged
+##   integration tests see DB_*/REDIS_* without a manual shell export.
+## - Drops Git-for-Windows' bundled xpdf pdftotext (v4.00, layout incompatible
+##   with the poppler CI uses) from PATH so the invoice PDF content tests
+##   resolve a real poppler; the filter is a no-op elsewhere.
 test:
 	@echo -e "🔍 Running tests..."
-	@go test -mod=readonly -count=1 -v -tags=all ./...
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	case "$$(uname -s)" in *MSYS*|*MINGW*) \
+		PATH=$$(printf '%s' "$$PATH" | tr ':' '\n' | awk '!/^\/(mingw64|usr)\/bin/ && !/\/[Gg]it\/(mingw64|usr)\/bin/' | paste -sd ':' -) ;; \
+	esac; \
+	go test -mod=readonly -count=1 -v -tags=all ./...
 
 SWAG_VERSION := v1.16.6
 SWAG_BIN := $(CURDIR)/.cache/tools/swag/$(SWAG_VERSION)/swag
@@ -59,3 +77,5 @@ migrate_up: install_goose
 migrate_down: install_goose
 	@echo "Reverting the last database migration..."
 	@"$(GOOSE_BIN)" -dir db/migrations postgres "$(DB_DSN)" down
+
+

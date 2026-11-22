@@ -24,7 +24,7 @@
 ## Workflow dev
 
 ```bash
-make run | make test                 # test = -tags=all ./... (PG+Redis requis, .env exporté)
+make run | make test                 # test = -tags=all ./... (PG+Redis requis ; la cible source .env elle-même)
 make migrate_up                      # superuser la 1re fois (crée les rôles) : make migrate_up DB_USER=postgres DB_PASS=...
 make generate_sqlc                   # après TOUTE modif de db/queries/ ou db/migrations/ — commit du généré (CI: git diff --exit-code internal/db)
 make generate_docs                   # après toute annotation Swagger
@@ -33,7 +33,7 @@ go test -mod=readonly -count=1 -race -tags=all . ./config ./models ./controllers
 ```
 
 - Garde-fous CI : `! grep` sur les imports legacy quotés (`sqlx`/`lib/pq`), diff du code sqlc généré, smoke test des routes, `govulncheck`.
-- Exception WSL : `./invoice` (test PDF) exige `pdftotext` (poppler), non installable localement → CI only.
+- `./invoice` (test PDF) exige un poppler réel : Windows natif OK (winget `oschwartz10612.Poppler` ; la cible `test` masque le pdftotext xpdf embarqué de Git for Windows) ; en WSL il faut installer `poppler-utils`.
 
 ## Environnement local (WSL Debian)
 

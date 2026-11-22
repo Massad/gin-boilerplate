@@ -19,7 +19,7 @@
 
 ## Limites connues (assumées, documentées)
 
-- `./invoice` : test PDF local impossible en WSL (poppler absent) → CI only.
+- `./invoice` : sous Windows natif, poppler installé (winget `oschwartz10612.Poppler`) et cible `test` masque le xpdf de Git for Windows → tests PDF verts en local ; en WSL, exiger l'installation de `poppler-utils` (non installé).
 - Port 9000 occupé localement (conteneur teable) → smoke test CI only.
 - Tenant suspendu : accès résiduel ≤ TTL access 15 min (trade-off accepté).
 - Tout le travail du plan est en working tree **non commité**.
@@ -29,6 +29,7 @@
 
 1–10 : implémentation T1–T13 (schéma/RRLS, env/secrets, pools, tenant model, auth+Redis, user, articles, forms, middleware, models admin + contrôleurs + routage). 11 : CI (app_user/app_admin) + Swagger. 12 : E7 nettoyage sqlx/lib/pq + garde-fous + docs. Terminé le 2026-11-21.
 13 : install Storybook dans `app/` (plan `1795339024940-install-storybook-front.md`) — groundwork design-system, 2026-11-22.
+14 : correction de l'environnement de test Windows (2026-11-22) — `.env` déquoté + `REDIS_PASSWORD` vidé, purge des données de test orphelines, Poppler 26.09 via winget, cible `test` du Makefile auto-source `.env` et masque sous MSYS/MINGW le pdftotext xpdf embarqué de Git for Windows ; `make test` vert (8 packages, zéro SKIP). README.md + AGENTS.md alignés. Non commité.
 
 ## Backlog déferré (hors périmètre accepté)
 

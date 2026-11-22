@@ -59,14 +59,12 @@ The application refuses to start with blank keys, keys shorter than 32 bytes,
 or identical keys. Redis authentication uses
 `REDIS_PASSWORD` when configured on your Redis server.
 
-Existing installations must generate the new admin key along with the two
-original ones. Changing them invalidates existing tokens, so users must log
-in again.
-
 Run the database migrations. The first run needs a PostgreSQL superuser
 because the migrations themselves create the `app_user` and `app_admin`
 application roles (the application must never connect as the superuser) —
-override `DB_USER`/`DB_PASS` just for this command:
+override `DB_USER`/`DB_PASS` just for this command.
+
+**macOS / Linux (bash):**
 
 ```bash
 set -a
@@ -75,19 +73,37 @@ set +a
 make migrate_up DB_USER=postgres DB_PASS='<superuser password>'
 ```
 
-Migrations are versioned SQL files in `db/migrations/` managed with
+**Windows (PowerShell):** export the variables from `.env` for the current
+session, then run the same command:
+
+```powershell
+Get-Content .env | ForEach-Object {
+    if ($_ -match '^\s*#' -or $_ -notmatch '=') { return }
+    $name, $value = $_.Split('=', 2)
+    $value = ($value.Trim() -replace '^"(.*)"$', '$1' -replace "^'(.*)'$", '$1')
+    Set-Item -Path "env:$name" -Value $value
+}
+make migrate_up DB_USER=postgres DB_PASS='<superuser password>'
+```
+
+`make` must be available on Windows (for example `choco install make`);
+under WSL, follow the macOS/Linux commands above.
+
+Migrations are versioned SQL files in `db/migrations/`, managed with
 [goose](https://github.com/pressly/goose). All application queries live in
 `db/queries/*.sql` and are compiled to type-safe Go code with
-[sqlc](https://github.com/sqlc-dev/sqlc). The `app_user` role is a
-non-superuser constrained by Row-Level Security; `app_admin` bypasses RLS
-for platform-level operations only (login, registration, admin backoffice).
-For production, set the application role passwords with
-`ALTER ROLE ... PASSWORD`.
+[sqlc](https://github.com/sqlc-dev/sqlc).
+
+- `app_user`: non-superuser role constrained by Row-Level Security
+- `app_admin`: bypasses RLS, used only for platform-level operations
+  (login, registration, admin backoffice)
+- In production, set the application role passwords with
+  `ALTER ROLE ... PASSWORD`
 
 Create the superadmin account (CLI bootstrap, no HTTP route involved):
 
 ```bash
-go run *.go -create-admin -email you@example.com -password 'a long random password'
+go run . -create-admin -email you@example.com -password 'a long random password'
 ```
 
 ### Running
@@ -99,32 +115,38 @@ make run
 Or directly:
 
 ```bash
-go run *.go
+go run .
 ```
 
 ### Building
 
 ```bash
-go build -v
+go build -v -o gin-boilerplate .
 ./gin-boilerplate
 ```
 
 ### Testing
 
 Invoice PDF content tests use `pdftotext` to verify the rendered invoice number,
-line items, and totals. Install it with `brew install poppler` on macOS or
-`sudo apt-get install poppler-utils` on Ubuntu, then run without database services:
+line items, and totals — install a real poppler first:
+
+- macOS: `brew install poppler`
+- Ubuntu: `sudo apt-get install poppler-utils`
+- Windows: `winget install --id oschwartz10612.Poppler` (open a new terminal
+  afterwards so the updated PATH is picked up)
+
+Then run without database services:
 
 ```bash
 go test -mod=readonly -count=1 -race -v ./invoice
 ```
 
-The full integration suite also requires running PostgreSQL and Redis:
+The full integration suite also requires running PostgreSQL and Redis.
+`make test` sources `.env` automatically before the tools run, so no manual
+export is needed. On Windows, make also masks Git-for-Windows' bundled
+`pdftotext` from the recipe PATH so the suite resolves the real poppler.
 
 ```bash
-set -a
-. ./.env
-set +a
 make test
 ```
 

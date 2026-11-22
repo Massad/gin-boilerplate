@@ -4,11 +4,11 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 
 ## Commandes
 
-- `make run` — lance l'app (`go run *.go`), nécessite `.env` chargé
-- `make test` — suite complète : `go test -mod=readonly -count=1 -v -tags=all ./...` (nécessite PostgreSQL + Redis actifs + `.env` exporté : `set -a; . ./.env; set +a`)
+- `make run` — lance l'app (`go run .`), nécessite `.env` chargé
+- `make test` — suite complète : `go test -mod=readonly -count=1 -v -tags=all ./...` (nécessite PostgreSQL + Redis actifs ; la cible source `.env` elle-même avant d'exécuter les outils, et masque sous Windows le `pdftotext` xpdf embarqué de Git for Windows : un poppler réel dans le PATH — `winget install --id oschwartz10612.Poppler` — est requis pour les tests PDF)
 - `make migrate_up` / `make migrate_down` — migrations goose (`db/migrations/`, épinglé dans le Makefile). JAMAIS de `psql < db/*.sql` direct. Le superuser n'est requis que pour migrer (la migration 000002 crée les rôles `app_user`/`app_admin`) ; l'app et les tests se connectent en rôles non-superuser
 - `make generate_sqlc` — régénère `internal/db/` ; à rejouer après TOUTE modification de `db/queries/` ou `db/migrations/`, code généré commité (la CI le vérifie par `git diff --exit-code internal/db`)
-- `go run *.go -create-admin -email <e> -password <p>` — bootstrap superadmin (CLI, aucune route HTTP) ; requiert le pool admin
+- `go run . -create-admin -email <e> -password <p>` — bootstrap superadmin (CLI, aucune route HTTP) ; requiert le pool admin
 - `go test -mod=readonly -count=1 -race -v ./invoice` — tests PDF sans base de données (requiert `pdftotext` / poppler)
 - `go build -mod=readonly .` et `go vet -mod=readonly ./...` — build + vet (toujours avec `-mod=readonly`)
 - `make generate_docs` — régénère la doc Swagger (swag épinglé v1.16.6, installé via `make install_swag`)
@@ -51,7 +51,7 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 Deux niveaux :
 
 - **Unitaires** (sans services, sans tag) : `config/secrets_test.go` (3 secrets ≥ 32 octets distincts), `models/tenant_test.go` (slugify/réservés, fonctions pures), `invoice/invoice_test.go` (requiert `pdftotext` / poppler) — exécutables via `go test -mod=readonly -count=1 -race ./<pkg>`
-- **Intégration** (derrière le tag `all`) : `tests/article_test.go` (suite HTTP complète via `httptest` + `SetupRouter`, séquentielle : `TestIntDB` initialise, `TestCleanUp` nettoie, état partagé via variables de package ; isolation croisée, RLS fail-closed en SQL brut, rôles admin), `controllers/auth_test.go`, `middleware/auth_test.go`, `internal/db/pool_test.go` (parse DSN pgx, mots de passe espacés/quotés) — nécessitent PostgreSQL + Redis actifs + `.env` exporté (`set -a; . ./.env; set +a` puis `make test`)
+- **Intégration** (derrière le tag `all`) : `tests/article_test.go` (suite HTTP complète via `httptest` + `SetupRouter`, séquentielle : `TestIntDB` initialise, `TestCleanUp` nettoie, état partagé via variables de package ; isolation croisée, RLS fail-closed en SQL brut, rôles admin), `controllers/auth_test.go`, `middleware/auth_test.go`, `internal/db/pool_test.go` (parse DSN pgx, mots de passe espacés/quotés) — nécessitent PostgreSQL + Redis actifs (lancés via `make test`, qui source `.env` automatiquement)
 
 Conventions de test :
 
