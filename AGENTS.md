@@ -17,7 +17,7 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 ## Structure
 
 - `main.go` — point d'entrée, routes `/v1`, annotations Swagger principales, fallback SPA (`r.NoRoute`), CLI `-create-admin`
-- `controllers/` — handlers HTTP (structs vides, méthodes avec annotations Swagger) ; `admin.go` (backoffice), `public.go` (lookup tenant public), `user.go` (auth), `article.go` (métier), `auth.go` (refresh)
+- `controllers/` — handlers HTTP (structs vides, méthodes avec annotations Swagger) ; `admin.go` (backoffice), `user.go` (auth), `article.go` (métier), `auth.go` (refresh)
 - `models/` — structs DB et services métier ; appellent le code sqlc via `pgdb.TenantStore()` / `pgdb.AdminStore()` et `pgdb.WithTenant`
 - `forms/` — structs de validation (tags `binding:`) + maps `XxxMessages`
 - `middleware/` — CORS, RequestID, `TokenAuth()` (JWT tenant), `AdminAuth()` (JWT admin, secret séparé), `RequirePermission` (RBAC minimal owner/member)
@@ -27,7 +27,7 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 - `db/queries/` — sources SQL de sqlc (articles, users, tenants, admins) : TOUTE requête SQL vit ici
 - `db/` racine : Redis seulement
 - `config/` — validation des 3 secrets de signature (`ValidateSigningSecrets`)
-- `invoice/` — exemple de facture HTML/PDF
+- `invoice/` — bibliothèque de génération de factures HTML/PDF, sans route HTTP
 - `docs/` — Swagger auto-généré (ne pas éditer à la main), `public/` — templates/statiques, `tests/` — tests d'intégration (tag `all`)
 
 ## Conventions

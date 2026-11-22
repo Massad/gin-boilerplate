@@ -2,8 +2,6 @@ package invoice_test
 
 import (
 	"bytes"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Massad/gin-boilerplate/invoice"
-	"github.com/gin-gonic/gin"
 )
 
 // Use an independent PDF reader: searching the raw bytes would miss compressed
@@ -110,21 +107,4 @@ func TestGeneratePDFContent(t *testing.T) {
 			assertPDFLines(t, data, tc.want)
 		})
 	}
-}
-
-func TestDownloadPDFContent(t *testing.T) {
-	router := gin.New()
-	router.GET("/v1/invoice/download", new(invoice.InvoiceController).Download)
-	response := httptest.NewRecorder()
-	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/invoice/download", nil))
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
-	}
-	if got := response.Header().Get("Content-Type"); got != "application/pdf" {
-		t.Errorf("Content-Type = %q, want application/pdf", got)
-	}
-	if got := response.Header().Get("Content-Disposition"); got != `attachment; filename="INV-001.pdf"` {
-		t.Errorf("unexpected Content-Disposition: %q", got)
-	}
-	assertPDFLines(t, response.Body.Bytes(), samplePDFLines())
 }

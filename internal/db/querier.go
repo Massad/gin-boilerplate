@@ -20,7 +20,6 @@ type Querier interface {
 	GetAdminByEmail(ctx context.Context, email string) (GetAdminByEmailRow, error)
 	GetArticle(ctx context.Context, arg GetArticleParams) (GetArticleRow, error)
 	GetTenantByID(ctx context.Context, id uuid.UUID) (Tenant, error)
-	GetTenantBySlug(ctx context.Context, slug string) (Tenant, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error)
 	GetUserForLogin(ctx context.Context, email string) (GetUserForLoginRow, error)
 	GetUserWithTenant(ctx context.Context, id uuid.UUID) (GetUserWithTenantRow, error)

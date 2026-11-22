@@ -149,15 +149,6 @@ func shortSlugCandidate(base string, attempt int) string {
 	return base + suffix
 }
 
-// OneBySlug ...
-func (m TenantModel) OneBySlug(slug string) (Tenant, error) {
-	row, err := pgdb.TenantStore().GetTenantBySlug(context.Background(), slug)
-	if err != nil {
-		return Tenant{}, err
-	}
-	return newTenant(row.ID, row.Slug, row.Name, row.Status, row.CreatedAt, row.UpdatedAt), nil
-}
-
 // All lists the tenants for the platform backoffice.
 func (m TenantModel) All() ([]Tenant, error) {
 	rows, err := pgdb.AdminStore().ListTenants(context.Background())

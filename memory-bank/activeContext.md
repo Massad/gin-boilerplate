@@ -8,6 +8,8 @@
 
 ## Récent (dernière session)
 
+- Retrait intégral de l'accès public (principe « rien de public ») : lookup `GET /v1/public/:slug` supprimé (controller, `OneBySlug`, `GetTenantBySlug` — code sqlc régénéré), routes invoice démo supprimées (`invoice/` devient bibliothèque PDF sans routes), Swagger servi uniquement hors `ENV=PRODUCTION` ; `generate_docs` rejoué, AGENTS.md/README/memory bank mis à jour.
+
 - Étape 12 (T18/E7) : retrait sqlx/lib/pq vérifié no-op, garde-fou CI « Check removed legacy drivers » (pattern sur imports quotés — le commentaire `lib/pq` de `internal/db/pool.go:70-72` est volontairement non matché), AGENTS.md + README.md mis à jour, docs Swagger non régénérées (aucune annotation touchée).
 - Nettoyage : 40 `.kilo/*.sh` one-offs supprimés (+ secrets embarqués), 6 `*_report.md` de la phase design supprimés, `.cache/` (137 Mo) supprimé, binaire `gin-boilerplate` supprimé + pattern `.gitignore` corrigé (`/gin-boilerplate`).
 - Revalidation complète : build, vet, unitaires purs (config, models), suite tag `all` sur 7 packages **y compris `./` (main_test.go, maillon manquant de l'étape 12)** — tout vert en `-race` (RLS prouvée en `app_user`/`app_admin`).

@@ -405,53 +405,6 @@ paths:
       summary: Get All Articles example
       tags:
       - Article
-  /invoice:
-    get:
-      description: Returns an HTML preview of a sample invoice
-      produces:
-      - text/html
-      responses:
-        "200":
-          description: HTML page
-          schema:
-            type: string
-      summary: Preview Invoice as HTML
-      tags:
-      - Invoice
-  /invoice/download:
-    get:
-      description: Generates and downloads a sample invoice as PDF
-      produces:
-      - application/pdf
-      responses:
-        "200":
-          description: PDF file
-          schema:
-            type: file
-        "500":
-          description: Error generating PDF
-          schema:
-            type: object
-      summary: Download Invoice as PDF
-      tags:
-      - Invoice
-  /public/{slug}:
-    get:
-      description: Expose the public directory data of an active tenant
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.MessageResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.MessageResponse'
-      summary: Public tenant lookup by slug
-      tags:
-      - Public
   /token/refresh:
     post:
       consumes:

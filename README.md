@@ -18,7 +18,6 @@ The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/
 - Built-in **custom form validators** with reusable error translation
 - **Multi-tenant isolation** — shared schema + `tenant_id` enforced by fail-closed PostgreSQL RLS
 - **Admin backoffice foundation** — separate superadmin login, tenant status control, audit trail
-- **Invoice example** — HTML preview and PDF download
 - **Swagger API documentation**
 - SSL support
 - Go Modules
@@ -175,16 +174,10 @@ To disable SSL, set `SSL=FALSE` in `.env`.
 | GET | `/v1/admin/tenants` | Admin | List tenants |
 | POST | `/v1/admin/tenants/:id/status` | Admin | Suspend or activate a tenant |
 
-### Public
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/public/:slug` | No | Public tenant lookup by slug (name and status only) |
-
-### Invoice (Example)
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/invoice` | No | HTML preview of a sample invoice with download button |
-| GET | `/v1/invoice/download` | No | Download sample invoice as PDF |
+There is no public API: every data route requires a tenant (`Bearer`) or
+admin token. Only the auth endpoints above (`register`, `login`,
+`token/refresh`, `admin/login`) and the SPA shell are reachable without
+identification.
 
 ## Swagger Docs
 
@@ -197,15 +190,8 @@ make run
 
 Then open: `https://localhost:9000/swagger/index.html`
 
-## Invoice Demo
-
-Once the server is running, open the invoice preview in your browser:
-
-```
-http://localhost:9000/v1/invoice
-```
-
-The page shows an HTML invoice with a **Download PDF** button that generates a PDF using [maroto](https://github.com/johnfercher/maroto) (pure Go, no external dependencies).
+The Swagger UI is served only outside `ENV=PRODUCTION`; the generated
+`docs/` spec stays available for tooling.
 
 ## Trusted Proxies & CORS
 
@@ -260,7 +246,7 @@ db/queries/     SQL sources for sqlc — all application queries live here
 db/migrations/  Versioned goose migrations
 db/             Redis initialization
 config/         Signing secrets validation
-invoice/        Invoice HTML/PDF generation example
+invoice/        HTML/PDF invoice generation library (no routes)
 docs/           Swagger documentation (auto-generated)
 public/         Static files and HTML templates
 tests/          Integration tests

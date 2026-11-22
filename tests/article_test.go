@@ -21,7 +21,6 @@ import (
 	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
 	pgdb "github.com/Massad/gin-boilerplate/internal/db"
-	"github.com/Massad/gin-boilerplate/invoice"
 	"github.com/Massad/gin-boilerplate/middleware"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/joho/godotenv"
@@ -63,12 +62,6 @@ func SetupRouter() *gin.Engine {
 		v1.PUT("/article/:id", middleware.TokenAuth(), article.Update)
 		v1.DELETE("/article/:id", middleware.TokenAuth(), article.Delete)
 
-		/*** START Invoice ***/
-		inv := new(invoice.InvoiceController)
-
-		v1.GET("/invoice", inv.Preview)
-		v1.GET("/invoice/download", inv.Download)
-
 		/*** START ADMIN ***/
 		admin := new(controllers.AdminController)
 
@@ -79,11 +72,6 @@ func SetupRouter() *gin.Engine {
 			adminAPI.GET("/tenants", admin.Tenants)
 			adminAPI.POST("/tenants/:id/status", admin.SetTenantStatus)
 		}
-
-		/*** START PUBLIC ***/
-		pub := new(controllers.PublicController)
-
-		v1.GET("/public/:slug", pub.One)
 	}
 
 	r.LoadHTMLGlob("../public/html/*")
@@ -932,67 +920,6 @@ func TestAdminReactivateTenant(t *testing.T) {
 	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
 	resp = doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
 	assert.Equal(t, http.StatusOK, resp.Code)
-}
-
-/**
-* TestPublicTenant
-* The public directory exposes an active tenant and 404s unknown or
-* reserved slugs
- */
-func TestPublicTenant(t *testing.T) {
-	testRouter := SetupRouter()
-
-	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/public/%s", tenantSlugB), nil, "")
-	assert.Equal(t, http.StatusOK, resp.Code)
-	var res struct {
-		Tenant struct {
-			ID   string `json:"id"`
-			Slug string `json:"slug"`
-		} `json:"tenant"`
-	}
-	decode(t, resp, &res)
-	assert.Equal(t, tenantSlugB, res.Tenant.Slug)
-	assert.Equal(t, tenantIDB, res.Tenant.ID)
-
-	resp = doRequest(testRouter, "GET", "/v1/public/this-slug-does-not-exist", nil, "")
-	assert.Equal(t, http.StatusNotFound, resp.Code)
-
-	resp = doRequest(testRouter, "GET", "/v1/public/admin", nil, "")
-	assert.Equal(t, http.StatusNotFound, resp.Code)
-}
-
-/**
-* TestInvoicePreview
-* Test invoice HTML preview
-*
-* Must return response code 200
- */
-func TestInvoicePreview(t *testing.T) {
-	testRouter := SetupRouter()
-
-	resp := doRequest(testRouter, "GET", "/v1/invoice", nil, "")
-
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Contains(t, resp.Header().Get("Content-Type"), "text/html")
-	assert.Contains(t, resp.Body.String(), "INV-001")
-	assert.Contains(t, resp.Body.String(), "Acme Corp")
-}
-
-/**
-* TestInvoiceDownload
-* Test invoice PDF download
-*
-* Must return response code 200 with PDF content type
- */
-func TestInvoiceDownload(t *testing.T) {
-	testRouter := SetupRouter()
-
-	resp := doRequest(testRouter, "GET", "/v1/invoice/download", nil, "")
-
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "application/pdf", resp.Header().Get("Content-Type"))
-	assert.Contains(t, resp.Header().Get("Content-Disposition"), "INV-001.pdf")
-	assert.True(t, resp.Body.Len() > 0, "PDF body should not be empty")
 }
 
 /**

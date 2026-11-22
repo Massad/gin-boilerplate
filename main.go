@@ -19,7 +19,6 @@ import (
 	_ "github.com/Massad/gin-boilerplate/docs"
 	"github.com/Massad/gin-boilerplate/forms"
 	pgdb "github.com/Massad/gin-boilerplate/internal/db"
-	"github.com/Massad/gin-boilerplate/invoice"
 	"github.com/Massad/gin-boilerplate/middleware"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-contrib/gzip"
@@ -162,12 +161,6 @@ func main() {
 		v1.PUT("/article/:id", middleware.TokenAuth(), article.Update)
 		v1.DELETE("/article/:id", middleware.TokenAuth(), article.Delete)
 
-		/*** START Invoice ***/
-		inv := new(invoice.InvoiceController)
-
-		v1.GET("/invoice", inv.Preview)
-		v1.GET("/invoice/download", inv.Download)
-
 		/*** START ADMIN ***/
 		admin := new(controllers.AdminController)
 
@@ -178,14 +171,11 @@ func main() {
 			adminAPI.GET("/tenants", admin.Tenants)
 			adminAPI.POST("/tenants/:id/status", admin.SetTenantStatus)
 		}
-
-		/*** START PUBLIC ***/
-		pub := new(controllers.PublicController)
-
-		v1.GET("/public/:slug", pub.One)
 	}
 
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+	if os.Getenv("ENV") != "PRODUCTION" {
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+	}
 
 	r.LoadHTMLGlob("./public/html/*")
 

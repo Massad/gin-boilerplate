@@ -11,8 +11,8 @@
 - [x] Auth admin (token unique ~8h, secret/préfixe/pool séparés, rejet croisé, pas de refresh admin)
 - [x] Articles tenant-aware via `WithTenant` (backlog RBAC `RequirePermission` posé, non câblé — YAGNI)
 - [x] Backoffice admin (login, tenants, toggle status + `admin_audit` atomique) + CLI `-create-admin` idempotent (testé)
-- [x] Routes `/v1/public/:slug` + fallback SPA `r.NoRoute` (404 sur `/v1*` et non-GET)
-- [x] Tests : unitaires purs + intégration tag `all` (7 packages), isolation croisée, RLS fail-closed (0 ligne sans `set_config`), insert cross-tenant 42501, un seul owner, backoffice, public — CI en non-superuser
+- [x] Principe « rien de public » : lookup `/v1/public/:slug` et routes invoice démo retirés, Swagger seulement hors production ; fallback SPA `r.NoRoute` (404 sur `/v1*` et non-GET)
+- [x] Tests : unitaires purs + intégration tag `all` (7 packages), isolation croisée, RLS fail-closed (0 ligne sans `set_config`), insert cross-tenant 42501, un seul owner, backoffice — CI en non-superuser
 - [x] CI : migrate_up superuser → tests en `app_user`/`app_admin`, sqlc-diff, legacy-drivers guard, smoke, govulncheck
 - [x] Docs : Swagger, README, AGENTS.md, memory bank
 
@@ -29,4 +29,4 @@
 
 ## Backlog déferré (hors périmètre accepté)
 
-Invitations/membres + routes `RequirePermission`, dashboard admin complet, SPA PWA, domaines custom, refresh httpOnly, multi-appartenance, facturation, persistance invoices, throttling `/v1/public/:slug`.
+Invitations/membres + routes `RequirePermission`, dashboard admin complet, SPA PWA, domaines custom, refresh httpOnly, multi-appartenance, facturation, persistance invoices.
