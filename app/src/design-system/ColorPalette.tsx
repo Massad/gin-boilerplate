@@ -9,11 +9,18 @@ export function ColorPalette() {
           <h3 className="text-sm font-semibold text-foreground">{group.title}</h3>
           <div className="flex flex-wrap gap-4">
             {group.tokens.map((item) => (
-              <Swatch key={item.name} token={item} />
+              <Swatch key={item.name} tokenItem={item} />
             ))}
           </div>
         </section>
       ))}
+      <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+        Palette monochrome : un seul accent — le noir — réservé aux actions
+        primaires. Les couleurs sémantiques n'apparaissent que sur les pastilles
+        de statut et les messages d'erreur. Toute couleur dérivée passe par{" "}
+        <code className="font-mono text-xs">color-mix()</code> à partir d'un
+        jeton.
+      </p>
     </div>
   )
 }

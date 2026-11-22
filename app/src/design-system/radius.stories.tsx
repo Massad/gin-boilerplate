@@ -2,8 +2,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { RadiusPalette } from "./RadiusPalette"
 
 /**
- * Échelle des rayons dérivée du jeton `--radius` de `src/index.css`
- * (facteurs 0.6 à 2.6, utilitaires Tailwind `rounded-*`).
+ * Rayons du contrat Atrium (« Open Design »), lus depuis les variables
+ * `--od-radius-*` de `src/index.css` : 6 / 8 / 12 px, jamais au-delà,
+ * plus la variante pill pour les pastilles.
  */
 const meta = {
   title: "Design System/Rayons",
@@ -14,8 +15,8 @@ export default meta
 
 type Story = StoryObj
 
-export const EchelleDesRayons: Story = {
-  name: "Échelle des rayons",
+export const Rayons: Story = {
+  name: "Rayons",
   parameters: { layout: "padded" },
   render: () => <RadiusPalette />,
 }

@@ -1,28 +1,56 @@
 import { Meta, Story } from "@storybook/addon-docs/blocks"
 import * as Colors from "./colors.stories"
-import * as Radius from "./radius.stories"
 import * as Typography from "./typography.stories"
+import * as Spacing from "./espacements.stories"
+import * as Radius from "./radius.stories"
+import * as Elevation from "./elevation.stories"
 
 <Meta title="Design System/Tokens" />
 
 # Contrat de jetons
 
-Toutes les palettes ci-dessous sont générées à l'exécution depuis les variables CSS de
-`src/index.css`. Le sélecteur de thème de la barre d'outils bascule la classe `.dark`
-sur `<html>` : les valeurs affichées reflètent le thème actif, sans redondance de
-code.
+Toutes les palettes ci-dessous sont générées à l'exécution depuis les variables
+`--od-*` de `src/index.css` — la réémission du bloc `:root` du design system
+**Atrium** (Open Design, base Shadcn, 53 variables). Affichées telles quelles : le
+contrat est clair-seul et ne varie pas avec le thème.
 
-Ce contrat est le point d'ancrage du futur pont « Open Design » : réémettre les
-variables dans le même format suffit à mettre à jour l'ensemble.
+Toute mise à jour part de la source Open Design : on modifie le bloc `--od-*` de
+`src/index.css`, jamais les palettes.
 
 ## Couleurs
 
+Palette monochrome : un seul accent — le noir — réservé aux actions primaires. Les
+couleurs sémantiques n'apparaissent que sur les pastilles de statut et les messages
+d'erreur.
+
 <Story of={Colors.Palette} />
-
-## Rayons
-
-<Story of={Radius.EchelleDesRayons} />
 
 ## Typographie
 
+Geist pour l'affichage et le texte courant, Fira Code pour les données techniques
+(domaines, adresses e-mail, URL d'espace de travail). L'interlignage du corps est
+de 1,5, celui des titres de 1,2.
+
 <Story of={Typography.FontesEtCorpsDeTexte} />
+
+## Espacements
+
+Grille de 4 px, du filet (`--od-space-1` · 4 px) au rythme vertical des sections
+(`--od-space-12` · 48 px).
+
+<Story of={Spacing.EchelleDesEspacements} />
+
+## Rayons
+
+6 / 8 / 12 px, jamais au-delà : sm pour les champs et boutons, md pour les cartes,
+lg pour les conteneurs surélevés, pill pour les pastilles.
+
+<Story of={Radius.Rayons} />
+
+## Élévation et mouvement
+
+Deux couches d'élévation au maximum — un filet plus une ombre diffuse. Focus visible
+sur chaque contrôle : anneau de 2 px canvas puis 2 px accent. Durées 150 / 200 ms,
+courbe `cubic-bezier(0.2, 0, 0, 1)`, rien au-delà de 250 ms.
+
+<Story of={Elevation.ElevationsEtMouvement} />

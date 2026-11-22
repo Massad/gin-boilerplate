@@ -5,26 +5,52 @@ import { Meta } from "@storybook/addon-docs/blocks"
 # Design system — introduction
 
 Ce Storybook est le terrain d'essai du design system de `app/`. Il est ancré sur le
-**contrat de jetons CSS** (`src/index.css`), pas sur des composants : les variables
-oklch de `:root` et du bloc `.dark` sont la source de vérité partagée avec l'outil de
-design externe (« Open Design »).
+**contrat de jetons Open Design** : le design system **Atrium** (Console Studio Nord,
+base Shadcn), réémis dans `src/index.css` sous le préfixe `--od-*`. Chaque palette est
+lue à l'exécution via `getComputedStyle` — aucune valeur n'est codée en dur dans les
+stories.
+
+## Contrat de jetons
+
+- Source de vérité : le bloc `:root` du design-system Atrium (Open Design), 53 variables.
+- Réémission : `src/index.css`, préfixe `--od-*`, coexiste avec les jetons shadcn
+  (`--background`, `--primary`…) dont les utilitaires Tailwind continuent de dépendre.
+- Portée : **clair-seul** — aucun bloc `.dark` n'est réémis ; le contrat d'affichage des
+  palettes `--od-*` ne varie pas avec le thème.
+- Toute mise à jour part de la source Open Design : on modifie le bloc `--od-*` de
+  `src/index.css`, jamais les composants.
 
 ## Ce que vous y trouverez
 
-- **Couleurs**, **Rayons**, **Typographie** : palettes lues à l'exécution via
-  `getComputedStyle` — aucune valeur n'est codée en dur dans les stories.
-- Le sélecteur de thème de la barre d'outils applique la classe `.dark` sur l'élément
-  `<html>`, le même mécanisme que celui de l'application
-  (`@custom-variant dark (&:is(.dark *))`) : ce que vous voyez basculer ici est ce que
-  l'application exécutera.
-- **Tokens** : la page de référence qui assemble toutes les palettes.
+- **Couleurs** : surfaces et texte, accent noir monochrome, états sémantiques — avec le
+  rôle d'usage de chaque jeton.
+- **Typographie** : Geist (affichage et texte courant), Fira Code (données techniques),
+  échelle 12 → 48 px, interlignage 1,5 / 1,2 et chasse des titres d'affichage. Si Geist
+  et Fira Code ne sont pas installés localement, les spécimens se rendent dans les
+  polices de repli déclarées dans le jeton.
+- **Espacements** : grille de 4 px, huit paliers de `--od-space-1` à `--od-space-12`.
+- **Rayons** : 6 / 8 / 12 px et la variante pill — jamais au-delà.
+- **Élévation et mouvement** : deux couches maximum, anneau de focus, durées 150 / 200 ms,
+  courbe standard, gabarit de conteneur 1280 px.
+- La mise en forme dérivée passe par `color-mix()` à partir d'un jeton, jamais par une
+  valeur en dur.
 
-## Le pont à venir
+## Règles d'usage Atrium
 
-Quand l'intégration « Open Design » réémettra les variables dans le même format que
-`src/index.css`, ces pages et ces stories se mettront à jour sans restructuration :
-aucun composant produit n'existe encore dans ce Storybook, et les palettes ne
-dépendent que des variables.
+Six règles non négociables ; en cas de doute, la règle la plus sobre l'emporte :
+
+1. **Palette uniquement** — aucune couleur en dur hors du bloc `:root` ; toute nuance
+   passe par `color-mix()`. Le noir est le seul accent.
+2. **Typographie** — Geist pour l'affichage et le texte, Fira Code pour les données
+   techniques. Graisses 400 / 500 / 600 seulement ; jamais d'ombre portée sur un texte.
+3. **Posture de mise en page** — grille de 4 px, rayons 6 / 8 / 12 px, deux couches
+   d'élevation au maximum. Aucune illustration décorative, aucun dégradé.
+4. **Un seul appel primaire** — une action primaire par écran ; les autres actions
+   restent secondaires.
+5. **Contraste des états** — le survol ne baisse jamais le contraste ; le focus est
+   visible sur chaque contrôle (anneau 2 px canvas puis 2 px accent).
+6. **Pas de vernis** — pas d'emoji, pas d'image générée, pas de micro-animation
+   décorative ; le contenu réel remplace tout remplissage.
 
 ## Conventions des stories
 

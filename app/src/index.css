@@ -128,3 +128,67 @@
     @apply font-sans;
     }
 }
+
+/*
+ * Contrat de jetons « Open Design » — design system Atrium (Console Studio
+ * Nord, base Shadcn). Réémission fidèle des 53 variables du bloc :root du
+ * design-system du projet Open Design, sous le préfixe --od- pour coexister
+ * avec les jetons shadcn ci-dessus. Toute mise à jour part de cette source :
+ * jamais de valeur en dur dans les composants. Contrat clair-seul : aucun
+ * bloc .dark n'est réémis.
+ */
+:root {
+    --od-bg: #ffffff;
+    --od-surface: #ffffff;
+    --od-surface-warm: var(--od-surface);
+    --od-fg: #111827;
+    --od-fg-2: var(--od-fg);
+    --od-muted: #64748b;
+    --od-meta: var(--od-muted);
+    --od-border: #e5e7eb;
+    --od-border-soft: var(--od-border);
+    --od-accent: #000000;
+    --od-accent-on: #ffffff;
+    --od-accent-hover: color-mix(in oklab, var(--od-accent), white 10%);
+    --od-accent-active: color-mix(in oklab, var(--od-accent), white 18%);
+    --od-success: #16a34a;
+    --od-warn: #d97706;
+    --od-danger: #dc2626;
+    --od-font-display: "Geist", "Geist Sans", -apple-system, system-ui, "Segoe UI", Arial, sans-serif;
+    --od-font-body: "Geist", "Geist Sans", -apple-system, system-ui, "Segoe UI", Arial, sans-serif;
+    --od-font-mono: "Fira Code", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+    --od-text-xs: 12px;
+    --od-text-sm: 14px;
+    --od-text-base: 16px;
+    --od-text-lg: 20px;
+    --od-text-xl: 24px;
+    --od-text-2xl: 32px;
+    --od-text-3xl: 40px;
+    --od-text-4xl: 48px;
+    --od-leading-body: 1.5;
+    --od-leading-tight: 1.2;
+    --od-tracking-display: -0.02em;
+    --od-space-1: 4px;
+    --od-space-2: 8px;
+    --od-space-3: 12px;
+    --od-space-4: 16px;
+    --od-space-5: 20px;
+    --od-space-6: 24px;
+    --od-space-8: 32px;
+    --od-space-12: 48px;
+    --od-radius-sm: 6px;
+    --od-radius-md: 8px;
+    --od-radius-lg: 12px;
+    --od-radius-pill: 9999px;
+    --od-elev-flat: none;
+    --od-elev-ring: 0 0 0 1px var(--od-border);
+    --od-elev-raised: 0 1px 2px 0 color-mix(in oklab, var(--od-fg), transparent 92%), 0 1px 3px 0 color-mix(in oklab, var(--od-fg), transparent 88%);
+    --od-focus-ring: 0 0 0 2px var(--od-bg), 0 0 0 4px var(--od-accent);
+    --od-motion-fast: 150ms;
+    --od-motion-base: 200ms;
+    --od-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --od-container-max: 1280px;
+    --od-container-gutter-desktop: 24px;
+    --od-container-gutter-tablet: 16px;
+    --od-container-gutter-phone: 16px;
+}
