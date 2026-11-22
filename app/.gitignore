@@ -2,3 +2,6 @@
 # npm package #
 ######################
 node_modules
+
+*storybook.log
+storybook-static

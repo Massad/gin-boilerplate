@@ -15,6 +15,7 @@
 - [x] Tests : unitaires purs + intégration tag `all` (7 packages), isolation croisée, RLS fail-closed (0 ligne sans `set_config`), insert cross-tenant 42501, un seul owner, backoffice — CI en non-superuser
 - [x] CI : migrate_up superuser → tests en `app_user`/`app_admin`, sqlc-diff, legacy-drivers guard, smoke, govulncheck
 - [x] Docs : Swagger, README, AGENTS.md, memory bank
+- [x] Frontend `app/` (2026-11-22) : Storybook 10.6.8 (react-vite, docs/a11y/themes), harness tokens `src/design-system/` (palettes runtime + MDX), gap lint réparé (flat config), `.storybook` dans tsconfig, job CI `frontend` — `pnpm lint` / `pnpm build` / `pnpm build-storybook` verts, `storybook doctor` OK
 
 ## Limites connues (assumées, documentées)
 
@@ -22,10 +23,12 @@
 - Port 9000 occupé localement (conteneur teable) → smoke test CI only.
 - Tenant suspendu : accès résiduel ≤ TTL access 15 min (trade-off accepté).
 - Tout le travail du plan est en working tree **non commité**.
+- Frontend : validation 100 % locale (lint/build/storybook build/doctor) — le job `frontend` n'a pas encore tourné sur GitHub.
 
 ## Historique des étapes (plan multi-tenant)
 
 1–10 : implémentation T1–T13 (schéma/RRLS, env/secrets, pools, tenant model, auth+Redis, user, articles, forms, middleware, models admin + contrôleurs + routage). 11 : CI (app_user/app_admin) + Swagger. 12 : E7 nettoyage sqlx/lib/pq + garde-fous + docs. Terminé le 2026-11-21.
+13 : install Storybook dans `app/` (plan `1795339024940-install-storybook-front.md`) — groundwork design-system, 2026-11-22.
 
 ## Backlog déferré (hors périmètre accepté)
 

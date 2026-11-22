@@ -12,7 +12,8 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 - `go test -mod=readonly -count=1 -race -v ./invoice` — tests PDF sans base de données (requiert `pdftotext` / poppler)
 - `go build -mod=readonly .` et `go vet -mod=readonly ./...` — build + vet (toujours avec `-mod=readonly`)
 - `make generate_docs` — régénère la doc Swagger (swag épinglé v1.16.6, installé via `make install_swag`)
-- CI (`.github/workflows/ci.yml`) : `go mod verify`, build, vet, vérif du code sqlc généré (`git diff --exit-code internal/db`), garde-fous « legacy drivers » (aucun import `sqlx`/`lib/pq`), tests avec `-race -tags=all`, smoke test des routes, `govulncheck ./...`. Migrations appliquées en superuser (`make migrate_up DB_USER=postgres DB_PASS=postgres`) puis tests exécutés en `app_user`/`app_admin` non-superuser — la RLS est réellement prouvée
+- Frontend `app/` (pnpm épinglé par `packageManager` via corepack, Node ≥ 22.12 — pas d'installation globale de pnpm) : `pnpm storybook` (Storybook, port 6006), `pnpm build-storybook` (build statique), `pnpm lint` (config flat), `pnpm build` (`tsc --noEmit` + Vite), `pnpm test` (vitest) ; `storybook doctor` pour le triage ; les scripts de build npm exigent l'approbation `allowBuilds` dans `app/pnpm-workspace.yaml`
+- CI (`.github/workflows/ci.yml`) : `go mod verify`, build, vet, vérif du code sqlc généré (`git diff --exit-code internal/db`), garde-fous « legacy drivers » (aucun import `sqlx`/`lib/pq`), tests avec `-race -tags=all`, smoke test des routes, `govulncheck ./...`. Migrations appliquées en superuser (`make migrate_up DB_USER=postgres DB_PASS=postgres`) puis tests exécutés en `app_user`/`app_admin` non-superuser — la RLS est réellement prouvée. Job `frontend` indépendant (Node 22 + pnpm, `install --frozen-lockfile`, `pnpm lint`, `pnpm build`, `pnpm build-storybook`) — pipeline Go inchangé
 
 ## Structure
 
@@ -28,6 +29,7 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 - `db/` racine : Redis seulement
 - `config/` — validation des 3 secrets de signature (`ValidateSigningSecrets`)
 - `invoice/` — bibliothèque de génération de factures HTML/PDF, sans route HTTP
+- `app/` — frontend Vite + React 19 + Tailwind 4 (TypeScript strict, pnpm) ; `app/.storybook/` — config Storybook (`@storybook/react-vite` 10, addons docs/a11y/themes, preview branché sur `app/src/index.css`) ; `app/src/design-system/` — palettes de tokens lues à l'exécution depuis les variables CSS de `app/src/index.css` (contrat jetons, pont « Open Design » futur) ; stories CSF colocalisées (`app/src/**/*.stories.tsx` + pages MDX) ; `app/eslint.config.js` — lint flat couvrant `.storybook/` et les stories
 - `docs/` — Swagger auto-généré (ne pas éditer à la main), `public/` — templates/statiques, `tests/` — tests d'intégration (tag `all`)
 
 ## Conventions

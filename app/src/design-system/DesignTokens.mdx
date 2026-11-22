@@ -1,0 +1,28 @@
+import { Meta, Story } from "@storybook/addon-docs/blocks"
+import * as Colors from "./colors.stories"
+import * as Radius from "./radius.stories"
+import * as Typography from "./typography.stories"
+
+<Meta title="Design System/Tokens" />
+
+# Contrat de jetons
+
+Toutes les palettes ci-dessous sont générées à l'exécution depuis les variables CSS de
+`src/index.css`. Le sélecteur de thème de la barre d'outils bascule la classe `.dark`
+sur `<html>` : les valeurs affichées reflètent le thème actif, sans redondance de
+code.
+
+Ce contrat est le point d'ancrage du futur pont « Open Design » : réémettre les
+variables dans le même format suffit à mettre à jour l'ensemble.
+
+## Couleurs
+
+<Story of={Colors.Palette} />
+
+## Rayons
+
+<Story of={Radius.EchelleDesRayons} />
+
+## Typographie
+
+<Story of={Typography.FontesEtCorpsDeTexte} />

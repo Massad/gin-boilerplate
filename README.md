@@ -193,6 +193,32 @@ Then open: `https://localhost:9000/swagger/index.html`
 The Swagger UI is served only outside `ENV=PRODUCTION`; the generated
 `docs/` spec stays available for tooling.
 
+## Frontend (`app/`)
+
+The `app/` directory is the SPA workspace (Vite + React 19 + TypeScript +
+Tailwind CSS 4). Node 22.12+ and pnpm 11+ are required (versions pinned in
+`package.json`; corepack supplies the exact pnpm):
+
+```bash
+cd app
+pnpm install
+pnpm dev            # Vite app — http://localhost:5173
+pnpm storybook      # Storybook — http://localhost:6006
+pnpm build          # tsc --noEmit + Vite build
+pnpm lint           # ESLint (flat config)
+pnpm build-storybook # Static Storybook build (storybook-static/)
+```
+
+Stories follow CSF and are colocated (`src/**/*.stories.tsx`). The
+`src/design-system/` palette stories and the "Design System" docs pages are
+generated at runtime from the CSS token contract in `src/index.css`
+(`:root` oklch variables + the `.dark` class), so the Storybook theme toolbar
+exercises the app's real dark-mode mechanism. See `app/README.md` for
+details.
+
+CI runs an independent `frontend` job (frozen-lockfile install, lint, build,
+Storybook build smoke) next to the Go pipeline.
+
 ## Trusted Proxies & CORS
 
 By default, `SetTrustedProxies(nil)` is configured — Gin will not trust any proxy headers. If you deploy behind a reverse proxy (nginx, CloudFlare, etc.), set your trusted proxy IPs:
@@ -250,6 +276,7 @@ invoice/        HTML/PDF invoice generation library (no routes)
 docs/           Swagger documentation (auto-generated)
 public/         Static files and HTML templates
 tests/          Integration tests
+app/            Frontend workspace (Vite + React 19, Storybook)
 ```
 
 ## Adding a New Resource

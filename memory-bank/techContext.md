@@ -5,6 +5,13 @@
 - Gin v1.12.0 + gzip ; PostgreSQL via **pgx/v5 v5.13.0** (pgxpool natif, `sql_package: pgx/v5`) ; requêtes compilées par **sqlc v1.27.0** ; migrations **goose v3.20.0** ; Redis client v7.4.1 ; JWT v4.5.2 ; bcrypt `golang.org/x/crypto` ; swag v1.16.6 ; maroto v2 (PDF) ; testify.
 - Outils CLI épinglés dans le Makefile (`install_sqlc`, `install_goose`, `install_swag` → `.cache/tools/`, gitignored, retéléchargés au premier make après nettoyage).
 
+## Stack frontend (app/)
+
+- Vite 8 + React 19 (TypeScript strict, `tsc --noEmit` dans `pnpm build`) ; Tailwind CSS 4 (`@tailwindcss/vite`, `tsc --noEmit` + Vite) ; tests vitest ; pnpm 11.20.0 épinglé (`packageManager` → corepack, pas d'installation globale), Node ≥ 22.12.
+- `app/pnpm-workspace.yaml` : `allowBuilds` (esbuild approuvé — pnpm 11 exige l'approbation des scripts de build, sinon `pnpm install` échoue avec `ERR_PNPM_IGNORED_BUILDS`) + `minimumReleaseAgeExclude`.
+- Storybook 10.6.8 (`@storybook/react-vite`, addons **docs / a11y / themes**) : `app/.storybook/main.ts` (`defineMain`, CSF) + `preview.tsx` (import `../src/index.css`, `withThemeByClassName` light `''` / dark `'dark'`) ; stories CSF colocalisées (`src/**/*.stories.tsx`) + pages MDX ; palettes `app/src/design-system/` lues à l'exécution via `getComputedStyle` (contrat jetons = variables CSS de `index.css`, pont « Open Design » futur, zéro rework).
+- Workflow frontend : `pnpm lint` (flat config couvrant `.storybook/`), `pnpm build`, `pnpm build-storybook` (smoke CI), `storybook doctor` (triage).
+
 ## Schéma (db/migrations, goose)
 
 - `000001_baseline.sql` : `user` + `article` — PK uuid `gen_random_uuid()`, timestamps `timestamptz`, trigger `set_updated_at()`, `UNIQUE(email)`. PostgreSQL ≥ 13 requis.

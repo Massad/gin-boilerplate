@@ -1,3 +1,11 @@
 {
-  "$schema": "https://app.kilo.ai/config.json"
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "open-design": {
+      "type": "stdio",
+      "command": "C:\\Users\\schat\\AppData\\Roaming\\Open Design\\en\\29f1f4f9478dc73e\\Open Design.exe",
+      "args": ["C:\\Users\\schat\\AppData\\Roaming\\Open Design\\launcher\\channels\\stable\\namespaces\\release-stable-win\\versions\\0.27.2\\payload\\resources\\app\\prebundled\\daemon\\daemon-cli.mjs","mcp"],
+      "env": {"OD_DATA_DIR":"C:\\Users\\schat\\AppData\\Roaming\\Open Design\\namespaces\\release-stable-win\\data","OD_SIDECAR_CLIENT_ENDPOINT":"\\\\.\\pipe\\open-design-sidecar-ce5d7e44021c12d07d35af95149ad8fe","OD_MCP_BOOTSTRAP_COMMAND":"C:\\Users\\schat\\AppData\\Local\\Programs\\Open Design\\Open Design.exe","OD_MCP_BOOTSTRAP_ARGS":"[\"--headless\"]","ELECTRON_RUN_AS_NODE":"1"}
+      }
+    }
 }
