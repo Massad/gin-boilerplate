@@ -14,10 +14,11 @@ import (
 
 	"github.com/Massad/gin-boilerplate/db"
 	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRefreshOnlyConsumesMatchingOwner exercises the adapted Lua script and the
@@ -32,40 +33,28 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db.InitRedis(1)
 	t.Cleanup(func() { _ = db.GetRedis().Close() })
-	if err := db.GetRedis().Ping().Err(); err != nil {
-		t.Fatal(err)
-	}
-	if err := pgdb.InitTenant(context.Background(), os.Getenv); err != nil {
-		t.Fatal(err)
-	}
-	if err := pgdb.InitAdmin(context.Background(), os.Getenv); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, db.GetRedis().Ping().Err())
+	require.NoError(t, pgdb.InitTenant(context.Background(), os.Getenv))
+	require.NoError(t, pgdb.InitAdmin(context.Background(), os.Getenv))
 
-	// Seed a tenant and its owner on the platform pool.
+	// Seed a tenant and its owner on the platform pool, from the seeded
+	// factories (unique slug and email per test name).
 	ctx := context.Background()
-	email := "refresh-owner@test.com"
-	tenant, err := pgdb.AdminStore().CreateTenant(ctx, pgdb.CreateTenantParams{Slug: "refresh-test-org", Name: "Refresh Test Org"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	testTenant := testutil.NewTenantFixture(t)
+	tenantUser, tenantForm := testutil.NewUserFixture(t)
+	tenant, err := pgdb.AdminStore().CreateTenant(ctx, pgdb.CreateTenantParams{Slug: testTenant.Slug, Name: testTenant.Name})
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		pgdb.AdminStore().Pool.Exec(context.Background(), "DELETE FROM public.tenant WHERE id=$1", tenant.ID)
 	})
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatal(err)
-	}
 	owner, err := pgdb.AdminStore().CreateUserOwner(ctx, pgdb.CreateUserOwnerParams{
-		Email:    email,
-		Password: string(passwordHash),
-		Name:     "testing",
+		Email:    tenantForm.Email,
+		Password: tenantUser.Password,
+		Name:     tenantForm.Name,
 		TenantID: tenant.ID,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	r := gin.New()
 	r.POST("/refresh", new(AuthController).Refresh)
@@ -74,27 +63,20 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	// the given owner.
 	seedRefresh := func(keyValue string, claimed uuid.UUID, suspended bool) (string, string) {
 		id := uuid.NewString()
-		if err := db.GetRedis().Set(id, keyValue, time.Minute).Err(); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, db.GetRedis().Set(id, keyValue, time.Minute).Err())
 		if suspended {
-			if _, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=0 WHERE id=$1", tenant.ID); err != nil {
-				t.Fatal(err)
-			}
+			_, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=0 WHERE id=$1", tenant.ID)
+			require.NoError(t, err)
 		}
 		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"refresh_uuid": id, "user_id": claimed.String(), "tenant_id": tenant.ID.String(), "exp": time.Now().Add(time.Minute).Unix(),
 		}).SignedString([]byte(os.Getenv("REFRESH_SECRET")))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		return id, token
 	}
 	refresh := func(token string) *httptest.ResponseRecorder {
 		body, err := json.Marshal(map[string]string{"refresh_token": token})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		req := httptest.NewRequest("POST", "/refresh", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
@@ -115,64 +97,49 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.wantStatus == http.StatusOK {
 				// Only the successful case expects an active tenant.
-				if _, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=1 WHERE id=$1", tenant.ID); err != nil {
-					t.Fatal(err)
-				}
+				_, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=1 WHERE id=$1", tenant.ID)
+				require.NoError(t, err)
 			}
 			suspended := tc.name == "suspended tenant"
 			id, token := seedRefresh(tc.keyValue, tc.claimed, suspended)
 			t.Cleanup(func() { db.GetRedis().Del(id) })
 
 			w := refresh(token)
-			if w.Code != tc.wantStatus {
-				t.Errorf("status = %d, want %d", w.Code, tc.wantStatus)
-			}
+			require.Equal(t, tc.wantStatus, w.Code, "refresh status mismatch")
 			remaining, err := db.GetRedis().Exists(id).Result()
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			wantRemaining := int64(0)
 			if tc.name == "owner mismatch" {
 				wantRemaining = 1
 			}
-			if remaining != wantRemaining {
-				t.Errorf("remaining refresh key = %d, want %d", remaining, wantRemaining)
-			}
+			require.Equal(t, wantRemaining, remaining, "remaining refresh key mismatch")
 			if w.Code == http.StatusOK {
 				var result struct {
 					AccessToken  string `json:"access_token"`
 					RefreshToken string `json:"refresh_token"`
 				}
-				if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
 				accessJWT, err := jwt.Parse(result.AccessToken, func(_ *jwt.Token) (interface{}, error) {
 					return []byte(os.Getenv("ACCESS_SECRET")), nil
 				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				claims := accessJWT.Claims.(jwt.MapClaims)
 				db.GetRedis().Del(claims["access_uuid"].(string))
-				if claims["user_id"] != owner.String() || claims["tenant_id"] != tenant.ID.String() || claims["role"] != "owner" {
-					t.Errorf("access claims = %v, want fresh owner identity", claims)
-				}
+				require.Equal(t, owner.String(), claims["user_id"], "claim user_id must carry the fresh owner identity")
+				require.Equal(t, tenant.ID.String(), claims["tenant_id"], "claim tenant_id must carry the fresh owner identity")
+				require.Equal(t, "owner", claims["role"], "claim role must carry the fresh owner identity")
 				refreshJWT, err := jwt.Parse(result.RefreshToken, func(_ *jwt.Token) (interface{}, error) {
 					return []byte(os.Getenv("REFRESH_SECRET")), nil
 				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				refreshClaims := refreshJWT.Claims.(jwt.MapClaims)
 				db.GetRedis().Del(refreshClaims["refresh_uuid"].(string))
-				if replay := refresh(token); replay.Code != http.StatusUnauthorized {
-					t.Errorf("replay status = %d, want 401", replay.Code)
-				}
+				replay := refresh(token)
+				require.Equal(t, http.StatusUnauthorized, replay.Code, "replay status must be unauthorized")
 			}
 			// Restore an active tenant for the remaining cases.
-			if _, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=1 WHERE id=$1", tenant.ID); err != nil {
-				t.Fatal(err)
-			}
+			_, err = pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=1 WHERE id=$1", tenant.ID)
+			require.NoError(t, err)
 		})
 	}
 }

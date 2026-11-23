@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/stretchr/testify/require"
 )
 
 // Run against an isolated PostgreSQL instance with trust authentication so the
@@ -27,7 +28,7 @@ func TestPostgresDSNPasswords(t *testing.T) {
 		if errorsAsPgx(err, &pgErr) && (pgErr.Code == "28P01" || pgErr.Code == "28000") {
 			t.Skipf("PostgreSQL reachable but authentication is %s: configure a trust-auth instance", pgErr.Code)
 		}
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	control.Close(ctx)
 
@@ -40,17 +41,11 @@ func TestPostgresDSNPasswords(t *testing.T) {
 				return os.Getenv(name)
 			}, os.Getenv("DB_USER"), password)
 			conn, err := pgx.Connect(ctx, dsn)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			defer conn.Close(ctx)
 			var name string
-			if err := conn.QueryRow(ctx, "SELECT current_database()").Scan(&name); err != nil {
-				t.Fatal(err)
-			}
-			if name != os.Getenv("DB_NAME") {
-				t.Fatalf("connected to %q, want configured database", name)
-			}
+			require.NoError(t, conn.QueryRow(ctx, "SELECT current_database()").Scan(&name))
+			require.Equal(t, os.Getenv("DB_NAME"), name, "connected to %q, want configured database", name)
 		})
 	}
 }

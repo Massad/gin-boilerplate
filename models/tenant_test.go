@@ -2,6 +2,8 @@ package models
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSlugify(t *testing.T) {
@@ -24,9 +26,7 @@ func TestSlugify(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := Slugify(tc.name); got != tc.want {
-				t.Fatalf("Slugify(%q) = %q, want %q", tc.name, got, tc.want)
-			}
+			require.Equal(t, tc.want, Slugify(tc.name), "Slugify(%q) mismatch", tc.name)
 		})
 	}
 }
@@ -51,9 +51,7 @@ func TestValidSlug(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.slug, func(t *testing.T) {
-			if got := ValidSlug(tc.slug); got != tc.want {
-				t.Fatalf("ValidSlug(%q) = %v, want %v", tc.slug, got, tc.want)
-			}
+			require.Equal(t, tc.want, ValidSlug(tc.slug), "ValidSlug(%q) mismatch", tc.slug)
 		})
 	}
 }
@@ -61,15 +59,11 @@ func TestValidSlug(t *testing.T) {
 func TestValidSlugReserved(t *testing.T) {
 	for slug := range reservedSlugs {
 		t.Run("reserved:"+slug, func(t *testing.T) {
-			if ValidSlug(slug) {
-				t.Fatalf("ValidSlug(%q) = true, want false for reserved slug", slug)
-			}
+			require.False(t, ValidSlug(slug), "ValidSlug(%q) must be false for a reserved slug", slug)
 		})
 	}
 	// A reserved prefix with a suffix remains valid.
-	if !ValidSlug("admin-s") {
-		t.Fatal("ValidSlug(\"admin-s\") = false, want true")
-	}
+	require.True(t, ValidSlug("admin-s"))
 }
 
 // filler returns n dash-safe filler bytes to build fixed-length slugs.

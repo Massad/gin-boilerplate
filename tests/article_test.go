@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,11 +20,11 @@ import (
 	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
 	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
 	"github.com/Massad/gin-boilerplate/middleware"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/joho/godotenv"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/stretchr/testify/require"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -112,9 +111,7 @@ func doRequest(r *gin.Engine, method, path string, body interface{}, token strin
 // decode unmarshals a JSON response body into v.
 func decode(t *testing.T, resp *httptest.ResponseRecorder, v interface{}) {
 	t.Helper()
-	if err := json.Unmarshal(resp.Body.Bytes(), v); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), v))
 }
 
 var loginCookie string
@@ -153,30 +150,17 @@ func TestIntDB(t *testing.T) {
 
 	//Load the .env file
 	err := godotenv.Load("../.env")
-	if err != nil {
-		log.Fatal("Error loading .env file, please create one in the root directory")
-	}
+	require.NoError(t, err, "loading .env: please create one in the root directory")
 
 	ctx := context.Background()
-	if err := pgdb.InitTenant(ctx, os.Getenv); err != nil {
-		log.Fatal(err)
-	}
-	if err := pgdb.InitAdmin(ctx, os.Getenv); err != nil {
-		log.Fatal(err)
-	}
+	require.NoError(t, pgdb.InitTenant(ctx, os.Getenv), "initializing the tenant pool")
+	require.NoError(t, pgdb.InitAdmin(ctx, os.Getenv), "initializing the admin pool")
 	db.InitRedis(1)
 
-	// Seed the platform backoffice admin (password hashed in Go).
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(testAdminPassword), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := pgdb.AdminStore().CreateAdmin(ctx, pgdb.CreateAdminParams{
-		Email:    testAdminEmail,
-		Password: string(passwordHash),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	// The suite's starting data is declarative: admin_user.yml carries the
+	// backoffice admin, while tenant/user/article start empty (the suite
+	// populates them through the HTTP flows).
+	testutil.LoadFixtures(t)
 }
 
 /**
@@ -196,7 +180,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 
 	var res struct {
 		Message string `json:"message"`
@@ -216,8 +200,8 @@ func TestRegister(t *testing.T) {
 	tenantIDA = res.Tenant.ID
 	tenantSlugA = res.Tenant.Slug
 
-	assert.Equal(t, "test-company", res.Tenant.Slug)
-	assert.Equal(t, "owner", res.User.Role)
+	require.Equal(t, "test-company", res.Tenant.Slug)
+	require.Equal(t, "owner", res.User.Role)
 }
 
 /**
@@ -237,7 +221,7 @@ func TestRegisterReservedSlug(t *testing.T) {
 	}
 
 	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
-	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
+	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -257,7 +241,7 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 	}
 
 	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
-	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
+	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -277,7 +261,7 @@ func TestRegisterInvalidEmail(t *testing.T) {
 	}
 
 	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
-	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
+	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -318,11 +302,11 @@ func TestLogin(t *testing.T) {
 	accessToken = res.Token.AccessToken
 	refreshToken = res.Token.RefreshToken
 
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, tenantSlugA, res.Tenant.Slug)
-	assert.Equal(t, tenantIDA, res.Tenant.ID)
-	assert.Equal(t, "owner", res.User.Role)
-	assert.Equal(t, tenantIDA, res.User.TenantID)
+	require.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, tenantSlugA, res.Tenant.Slug)
+	require.Equal(t, tenantIDA, res.Tenant.ID)
+	require.Equal(t, "owner", res.User.Role)
+	require.Equal(t, tenantIDA, res.User.TenantID)
 }
 
 /**
@@ -340,7 +324,7 @@ func TestLoginUppercaseEmail(t *testing.T) {
 	}
 
 	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -358,7 +342,7 @@ func TestInvalidLogin(t *testing.T) {
 	}
 
 	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
-	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
+	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -385,7 +369,7 @@ func TestCreateArticle(t *testing.T) {
 
 	articleID = res.ID
 
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -411,16 +395,16 @@ func TestListArticles(t *testing.T) {
 	}
 	decode(t, resp, &res)
 
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Len(t, res.Results, 1)
-	assert.Equal(t, 1, res.Results[0].Meta.Total)
+	require.Equal(t, http.StatusOK, resp.Code)
+	require.Len(t, res.Results, 1)
+	require.Equal(t, 1, res.Results[0].Meta.Total)
 	var found bool
 	for _, item := range res.Results[0].Data {
 		if item.ID == articleID {
 			found = true
 		}
 	}
-	assert.True(t, found, "list must contain the created article")
+	require.True(t, found, "list must contain the created article")
 }
 
 /**
@@ -433,7 +417,7 @@ func TestGetArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
 	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, accessToken)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 
 	var res struct {
 		Data struct {
@@ -444,7 +428,7 @@ func TestGetArticle(t *testing.T) {
 		} `json:"data"`
 	}
 	decode(t, resp, &res)
-	assert.Equal(t, articleID, res.Data.ID)
+	require.Equal(t, articleID, res.Data.ID)
 }
 
 /**
@@ -457,7 +441,7 @@ func TestGetInvalidArticle(t *testing.T) {
 	testRouter := SetupRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/article/invalid", nil, accessToken)
-	assert.Equal(t, http.StatusNotFound, resp.Code)
+	require.Equal(t, http.StatusNotFound, resp.Code)
 }
 
 /**
@@ -470,7 +454,7 @@ func TestGetArticleNotLoggedin(t *testing.T) {
 	testRouter := SetupRouter()
 
 	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, "")
-	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	require.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -483,7 +467,7 @@ func TestGetArticleUnauthorized(t *testing.T) {
 	testRouter := SetupRouter()
 
 	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, "abc123")
-	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	require.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -501,7 +485,7 @@ func TestUpdateArticle(t *testing.T) {
 	}
 
 	resp := doRequest(testRouter, "PUT", fmt.Sprintf("/v1/article/%s", articleID), form, accessToken)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -520,7 +504,7 @@ func TestCrossTenantIsolation(t *testing.T) {
 		Company:  "Second Company",
 	}
 	resp := doRequest(testRouter, "POST", "/v1/user/register", registerForm, "")
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 	var registration struct {
 		Tenant struct {
 			ID   string `json:"id"`
@@ -530,7 +514,7 @@ func TestCrossTenantIsolation(t *testing.T) {
 	decode(t, resp, &registration)
 	tenantIDB = registration.Tenant.ID
 	tenantSlugB = registration.Tenant.Slug
-	assert.NotEmpty(t, tenantIDB)
+	require.NotEmpty(t, tenantIDB)
 
 	// Login tenant B.
 	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
@@ -550,14 +534,14 @@ func TestCrossTenantIsolation(t *testing.T) {
 	decode(t, resp, &loginRes)
 	accessTokenB = loginRes.Token.AccessToken
 	refreshTokenB = loginRes.Token.RefreshToken
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, tenantIDB, loginRes.User.TenantID)
-	assert.Equal(t, "second-company", loginRes.Tenant.Slug)
+	require.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, tenantIDB, loginRes.User.TenantID)
+	require.Equal(t, "second-company", loginRes.Tenant.Slug)
 
 	// A's article is invisible for B (RLS: the row does not exist).
-	assert.Equal(t, http.StatusNotFound, doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, accessTokenB).Code)
-	assert.Equal(t, http.StatusNotFound, doRequest(testRouter, "PUT", fmt.Sprintf("/v1/article/%s", articleID), forms.CreateArticleForm{Title: "Stolen title", Content: "Stolen content"}, accessTokenB).Code)
-	assert.Equal(t, http.StatusNotFound, doRequest(testRouter, "DELETE", fmt.Sprintf("/v1/article/%s", articleID), nil, accessTokenB).Code)
+	require.Equal(t, http.StatusNotFound, doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, accessTokenB).Code)
+	require.Equal(t, http.StatusNotFound, doRequest(testRouter, "PUT", fmt.Sprintf("/v1/article/%s", articleID), forms.CreateArticleForm{Title: "Stolen title", Content: "Stolen content"}, accessTokenB).Code)
+	require.Equal(t, http.StatusNotFound, doRequest(testRouter, "DELETE", fmt.Sprintf("/v1/article/%s", articleID), nil, accessTokenB).Code)
 
 	// B's own list is empty.
 	var listRes struct {
@@ -569,8 +553,8 @@ func TestCrossTenantIsolation(t *testing.T) {
 		} `json:"results"`
 	}
 	decode(t, doRequest(testRouter, "GET", "/v1/articles", nil, accessTokenB), &listRes)
-	assert.Equal(t, 0, listRes.Results[0].Meta.Total)
-	assert.Len(t, listRes.Results[0].Data, 0)
+	require.Equal(t, 0, listRes.Results[0].Meta.Total)
+	require.Len(t, listRes.Results[0].Data, 0)
 }
 
 /**
@@ -587,7 +571,7 @@ func TestGetArticleB(t *testing.T) {
 		Content: "B article content",
 	}
 	resp := doRequest(testRouter, "POST", "/v1/article", form, accessTokenB)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 
 	var created struct {
 		ID string `json:"id"`
@@ -595,7 +579,7 @@ func TestGetArticleB(t *testing.T) {
 	decode(t, resp, &created)
 
 	resp = doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", created.ID), nil, accessTokenB)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -610,42 +594,31 @@ func TestRLSFailClosed(t *testing.T) {
 
 	// 1. No tenant context: the policies close everything.
 	tx, err := pool.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var count int
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&count); err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, 0, count, "article rows must be invisible without tenant context")
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM "user"`).Scan(&count); err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, 0, count, "user rows must be invisible without tenant context")
+	err = tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 0, count, "article rows must be invisible without tenant context")
+	err = tx.QueryRow(ctx, `SELECT count(*) FROM "user"`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 0, count, "user rows must be invisible without tenant context")
 	_ = tx.Rollback(ctx)
 
 	// 2. A wrong tenant context: still nothing.
 	tx, err = pool.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, uuid.NewString()); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&count); err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, 0, count, "article rows must be invisible for a foreign tenant")
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, uuid.NewString())
+	require.NoError(t, err)
+	err = tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, 0, count, "article rows must be invisible for a foreign tenant")
 	_ = tx.Rollback(ctx)
 
 	// 3. Cross tenant insert is rejected.
 	tx, err = pool.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDB); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDB)
+	require.NoError(t, err)
 	_, err = tx.Exec(ctx,
 		`INSERT INTO article (tenant_id, user_id, title, content)
 		 SELECT $1, b.id, 'stolen', 'stolen content'
@@ -654,32 +627,23 @@ func TestRLSFailClosed(t *testing.T) {
 		tenantIDA, testEmailB)
 	// The insert targets tenant A while the RLS context is tenant B: the
 	// policy must reject the violating row with 42501.
-	if err == nil {
-		t.Fatal("cross-tenant insert unexpectedly succeeded (RLS WITH CHECK failed)")
-	}
+	require.Error(t, err, "cross-tenant insert unexpectedly succeeded (RLS WITH CHECK failed)")
 	pgErr, ok := err.(*pgconn.PgError)
-	if !ok || pgErr.Code != "42501" {
-		t.Fatalf("expected RLS violation 42501, got %v", err)
-	}
+	require.True(t, ok && pgErr.Code == "42501", "expected RLS violation 42501, got %v", err)
 	_ = tx.Rollback(ctx)
 
 	// 4. Within its own tenant context, tenant B sees its rows and can insert.
 	tx, err = pool.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDB); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDB)
+	require.NoError(t, err)
 	var bCount int
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM "user"`).Scan(&bCount); err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, 1, bCount, "tenant B sees its own user inside its context")
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&bCount); err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, 1, bCount, "tenant B sees exactly its own article")
+	err = tx.QueryRow(ctx, `SELECT count(*) FROM "user"`).Scan(&bCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, bCount, "tenant B sees its own user inside its context")
+	err = tx.QueryRow(ctx, `SELECT count(*) FROM article`).Scan(&bCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, bCount, "tenant B sees exactly its own article")
 	_ = tx.Rollback(ctx)
 }
 
@@ -692,24 +656,17 @@ func TestOneOwnerConstraint(t *testing.T) {
 	pool := pgdb.TenantStore().Pool
 
 	tx, err := pool.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDA); err != nil {
-		t.Fatal(err)
-	}
+	_, err = tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantIDA)
+	require.NoError(t, err)
 	_, err = tx.Exec(ctx,
 		`INSERT INTO "user" (email, password, name, tenant_id, role)
 		 VALUES ($1, $2, $3, $4, 'owner')`,
 		"second-owner@test.com", "irrelevant-hash", "Second Owner", tenantIDA)
-	if err == nil {
-		t.Fatal("second owner unexpectedly inserted")
-	}
+	require.Error(t, err, "second owner unexpectedly inserted")
 	pgErr, ok := err.(*pgconn.PgError)
-	if !ok || pgErr.Code != "23505" {
-		t.Fatalf("expected unique violation 23505, got %v", err)
-	}
+	require.True(t, ok && pgErr.Code == "23505", "expected unique violation 23505, got %v", err)
 }
 
 /**
@@ -733,10 +690,10 @@ func TestRefreshToken(t *testing.T) {
 
 	// The original refresh token is kept as the replay subject: the refreshed
 	// pair is a different session.
-	assert.NotEmpty(t, res.AccessToken)
-	assert.NotEmpty(t, res.RefreshToken)
+	require.NotEmpty(t, res.AccessToken)
+	require.NotEmpty(t, res.RefreshToken)
 
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -752,7 +709,7 @@ func TestInvalidRefreshToken(t *testing.T) {
 	tokenForm := forms.Token{RefreshToken: refreshToken}
 
 	resp := doRequest(testRouter, "POST", "/v1/token/refresh", tokenForm, "")
-	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	require.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -765,7 +722,7 @@ func TestUserLogout(t *testing.T) {
 	testRouter := SetupRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/user/logout", nil, accessToken)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -789,8 +746,8 @@ func TestAdminLogin(t *testing.T) {
 	decode(t, resp, &res)
 	adminAccessToken = res.Token.AccessToken
 
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.NotEmpty(t, adminAccessToken)
+	require.Equal(t, http.StatusOK, resp.Code)
+	require.NotEmpty(t, adminAccessToken)
 }
 
 /**
@@ -805,7 +762,7 @@ func TestAdminLoginWithUserCredentials(t *testing.T) {
 	loginForm := forms.LoginForm{Email: testEmail, Password: testPassword}
 
 	resp := doRequest(testRouter, "POST", "/v1/admin/login", loginForm, "")
-	assert.Equal(t, http.StatusNotAcceptable, resp.Code)
+	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
 /**
@@ -827,13 +784,13 @@ func TestAdminTenants(t *testing.T) {
 	}
 	decode(t, resp, &res)
 
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 	slugs := map[string]bool{}
 	for _, tenant := range res.Tenants {
 		slugs[tenant.Slug] = true
 	}
-	assert.True(t, slugs[tenantSlugA])
-	assert.True(t, slugs[tenantSlugB])
+	require.True(t, slugs[tenantSlugA])
+	require.True(t, slugs[tenantSlugB])
 }
 
 /**
@@ -846,7 +803,7 @@ func TestAdminTokenOnTenantRoute(t *testing.T) {
 	testRouter := SetupRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/articles", nil, adminAccessToken)
-	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	require.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -859,7 +816,7 @@ func TestUserTokenOnAdminRoute(t *testing.T) {
 	testRouter := SetupRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/admin/tenants", nil, accessTokenB)
-	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	require.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -873,7 +830,7 @@ func TestAdminSuspendTenant(t *testing.T) {
 
 	body := map[string]int16{"status": 0}
 	resp := doRequest(testRouter, "POST", fmt.Sprintf("/v1/admin/tenants/%s/status", tenantIDB), body, adminAccessToken)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -887,7 +844,7 @@ func TestSuspendedTenantLogin(t *testing.T) {
 
 	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
 	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
-	assert.Equal(t, http.StatusForbidden, resp.Code)
+	require.Equal(t, http.StatusForbidden, resp.Code)
 }
 
 /**
@@ -901,7 +858,7 @@ func TestSuspendedTenantRefresh(t *testing.T) {
 
 	tokenForm := forms.Token{RefreshToken: refreshTokenB}
 	resp := doRequest(testRouter, "POST", "/v1/token/refresh", tokenForm, "")
-	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	require.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -915,11 +872,11 @@ func TestAdminReactivateTenant(t *testing.T) {
 
 	body := map[string]int16{"status": 1}
 	resp := doRequest(testRouter, "POST", fmt.Sprintf("/v1/admin/tenants/%s/status", tenantIDB), body, adminAccessToken)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 
 	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
 	resp = doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 }
 
 /**
@@ -932,10 +889,10 @@ func TestAdminLogout(t *testing.T) {
 	testRouter := SetupRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/admin/logout", nil, adminAccessToken)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, http.StatusOK, resp.Code)
 
 	resp = doRequest(testRouter, "GET", "/v1/admin/tenants", nil, adminAccessToken)
-	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+	require.Equal(t, http.StatusUnauthorized, resp.Code)
 }
 
 /**
@@ -948,12 +905,10 @@ func TestAdminLogout(t *testing.T) {
 func TestCleanUp(t *testing.T) {
 	ctx := context.Background()
 
-	if _, err := pgdb.AdminStore().Pool.Exec(ctx, "DELETE FROM public.tenant"); err != nil {
-		t.Error(err)
-	}
-	if _, err := pgdb.AdminStore().Pool.Exec(ctx, "DELETE FROM public.admin_user WHERE email=$1", testAdminEmail); err != nil {
-		t.Error(err)
-	}
+	_, err := pgdb.AdminStore().Pool.Exec(ctx, "DELETE FROM public.tenant")
+	require.NoError(t, err)
+	_, err = pgdb.AdminStore().Pool.Exec(ctx, "DELETE FROM public.admin_user WHERE email=$1", testAdminEmail)
+	require.NoError(t, err)
 
 	// Flush this suite's Redis keys: tenant session index sets and admin keys.
 	if indexKeys, err := db.GetRedis().Keys("user_sessions:*").Result(); err == nil {

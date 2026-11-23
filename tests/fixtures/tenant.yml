@@ -1,0 +1,4 @@
+# Tenants are created by the integration suite itself through the HTTP
+# registration flow (TestRegister, TestCrossTenantIsolation): the starting
+# data declared here stays empty.
+[]

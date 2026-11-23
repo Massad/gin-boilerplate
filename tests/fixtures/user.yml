@@ -1,0 +1,4 @@
+# Users are created by the integration suite itself through the HTTP
+# registration flow and the raw-SQL RLS scenarios: the starting data declared
+# here stays empty.
+[]

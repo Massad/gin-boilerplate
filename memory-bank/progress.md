@@ -30,6 +30,7 @@
 1–10 : implémentation T1–T13 (schéma/RRLS, env/secrets, pools, tenant model, auth+Redis, user, articles, forms, middleware, models admin + contrôleurs + routage). 11 : CI (app_user/app_admin) + Swagger. 12 : E7 nettoyage sqlx/lib/pq + garde-fous + docs. Terminé le 2026-11-21.
 13 : install Storybook dans `app/` (plan `1795339024940-install-storybook-front.md`) — groundwork design-system, 2026-11-22.
 14 : correction de l'environnement de test Windows (2026-11-22) — `.env` déquoté + `REDIS_PASSWORD` vidé, purge des données de test orphelines, Poppler 26.09 via winget, cible `test` du Makefile auto-source `.env` et masque sous MSYS/MINGW le pdftotext xpdf embarqué de Git for Windows ; `make test` vert (8 packages, zéro SKIP). README.md + AGENTS.md alignés. Non commité.
+15 : stack de test intégrée (2026-11-23, plan `1795428465642-stack-test-go.md`) — mockery v2.53.8 épinglé (mocks commités, génération idempotente), gofakeit/v7 + testfixtures/v3 + testcontainers-go + goose v3.20.0 en go.mod, helpers `internal/testutil/` (factories seedées, chargeur de fixtures, Postgres éphémère), fixtures YAML `tests/fixtures/`, retrofit `require` des 7 fichiers de test, garde CI « fuite helpers ». Suite `all` verte avec fixtures/factories ; testcontainers SKIP sans Docker. Non commité (convention : commits quand l'utilisateur le décide).
 
 ## Backlog déferré (hors périmètre accepté)
 

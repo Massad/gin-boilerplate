@@ -3,6 +3,8 @@ package config
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateSigningSecrets(t *testing.T) {
@@ -35,17 +37,13 @@ func TestValidateSigningSecrets(t *testing.T) {
 			values := map[string]string{"ACCESS_SECRET": tc.access, "REFRESH_SECRET": tc.refresh, "ADMIN_ACCESS_SECRET": tc.admin}
 			err := ValidateSigningSecrets(func(name string) string { return values[name] })
 			if tc.want == "" {
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return
 			}
-			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("expected error containing %q, got %v", tc.want, err)
-			}
+			require.ErrorContains(t, err, tc.want)
 			for name, key := range map[string]string{"ACCESS_SECRET": tc.access, "REFRESH_SECRET": tc.refresh, "ADMIN_ACCESS_SECRET": tc.admin} {
-				if key != "" && strings.Contains(err.Error(), key) {
-					t.Fatalf("error reveals %s key: %v", name, err)
+				if key != "" {
+					require.NotContains(t, err.Error(), key, "%s key must not be revealed", name)
 				}
 			}
 		})

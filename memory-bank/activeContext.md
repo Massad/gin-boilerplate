@@ -2,6 +2,15 @@
 
 > File de contexte courant — mettre à jour à CHAQUE session (pattern memory bank).
 
+## Outils de test (session 2026-11-23, plan stack-test-go)
+
+- Quatre outils ajoutés et épinglés : **gofakeit/v7** (factories seedées par nom de test : `gofakeit.Seed(int64(crc32.ChecksumIEEE([]byte(t.Name()))))` en tête de chaque factory — la valeur 0 force un reseed aléatoire, d'où le garde 0→1), **testfixtures/v3** (fixtures YAML `tests/fixtures/` chargées via le pool admin, une fois par suite), **testcontainers-go** (Postgres éphémère opt-in — skip propre sans Docker : la lib n'expose pas de sonde daemon, le skip se fait par gestion d'erreur au démarrage), **mockery** CLI v2.53.8 dans le Makefile pattern `.cache/tools/` (`make generate_mocks` → mocks commités `internal/mocks/`, config `.mockery.yaml`, interfaces DBTX/Querier uniquement).
+- goose en bibliothèque (v3.20.0, aligné CLI) exécute les migrations du conteneur éphémère (`internal/testutil/postgres.go`, Provider API).
+- Pièges découverts à l'exécution : les rôles non-superuser ne peuvent ni `TRUNCATE` (privilège absent) ni `ALTER TABLE ... DISABLE/ENABLE TRIGGER ALL` (ownership requis) — le chargeur purge donc en `DELETE` (enfants d'abord, cascades actives) et un connecteur enveloppé intercepte les seuls batches de toggle de triggers de testfixtures ; contraintes FK restent actives, fichiers fixtures ordonnés par dépendance (admin_user, tenant, user, article).
+- Course de données corrigée avec `-p 1` sur `make test` (Makefile + CI) : les packages tournent désormais en série — le purge de début de suite supprimait à l'occasion le tenant/admin que `controllers`/`main` (packages parallèles) venaient de seed, ce qui faisait échouer la suite ~1 run sur 4. La convention « suite séquentielle » est maintenant appliquée au niveau packages.
+- La suite `all` a conservé ses garanties : ordre séquentiel de `tests/article_test.go` (variables de package, pas de testify/suite), tests RLS fail-closed intacts, `-race` en CI (gcc absent localement), skips Redis.
+- Validé : `make test` vert (9 packages ; testcontainers SKIP propre), mocks idempotents (2× `make generate_mocks` → diff vide), `go mod verify`.
+
 ## État actuel (2026-11-22)
 
 **Plan « Install Storybook in app/ » exécuté** (`.kilo/plans/1795339024940-install-storybook-front.md`). Points clés :

@@ -1,0 +1,6 @@
+# Platform backoffice admin seeded for the integration suite. This is the
+# data extracted verbatim from the previous inline TestIntDB seeding: the
+# password is the bcrypt hash of the suite's test admin password. The id and
+# timestamp columns keep their database defaults.
+- email: platform-backoffice@test.com
+  password: '$2a$10$WcdsFSwnYa9o.7x7LB/baO1WpEbEKUKD4NcOtjjiRQvPkE5iS1EO6'

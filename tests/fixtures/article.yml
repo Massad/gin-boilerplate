@@ -1,0 +1,3 @@
+# Articles are created by the integration suite itself through the HTTP CRUD
+# flow: the starting data declared here stays empty.
+[]

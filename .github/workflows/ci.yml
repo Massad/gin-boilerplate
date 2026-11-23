@@ -86,10 +86,18 @@ jobs:
           # Comment prose may mention the retired drivers; only quoted import
           # paths are regressions.
           ! grep -rEn '"(github\.com/)?(jmoiron/sqlx|lib/pq)"' --include='*.go' .
+      - name: Check test helper isolation
+        run: |
+          # internal/testutil carries test-only dependencies (gofakeit,
+          # testfixtures, testcontainers): importing it outside *_test.go
+          # files would leak them into the production binary.
+          if git grep -l "internal/testutil" -- '*.go' ':(exclude)*_test.go'; then
+            exit 1
+          fi
       - name: Install PDF content test dependency
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
       - name: Test
-        run: go test -mod=readonly -count=1 -race -v -tags=all ./...
+        run: go test -mod=readonly -count=1 -p 1 -race -v -tags=all ./...
       - name: Smoke test production routes
         run: |
           smoke_dir=$(mktemp -d)

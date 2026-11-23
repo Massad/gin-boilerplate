@@ -55,7 +55,10 @@ Deux niveaux :
 
 Conventions de test :
 
-- testify (`assert`), `httptest` + `gin.SetMode(gin.TestMode)`, `binding.Validator = new(forms.DefaultValidator)` pour les routes testées
+- testify (`require` partout), `httptest` + `gin.SetMode(gin.TestMode)`, `binding.Validator = new(forms.DefaultValidator)` pour les routes testées
+- Outils de test Go (versions figées) : gofakeit/v7 (données seedées par nom de test), testfixtures/v3 (fixtures YAML `tests/fixtures/` chargées via le pool admin), testcontainers-go (Postgres éphémère opt-in, skip sans Docker), mockery (`make generate_mocks`, mocks commités dans `internal/mocks/` — interfaces DBTX/Querier)
+- Helpers : `internal/testutil/factory.go` (factories), `fixtures.go` (chargeur), `postgres.go` (conteneur) — importés uniquement par des `*_test.go` (garde CI « fuite helpers »)
+- La suite d'intégration `all` garde ses conventions : séquentialité, RLS prouvée, rôles non-superuser, skips Redis
 - Secrets de test via `t.Setenv` (jamais de vraies clés), isolation via `t.Cleanup`, tests table-driven avec sous-tests quand pertinent
 - Tests Redis : skip si `REDIS_HOST` absent ; utiliser une base/instance de test dédiée ; les tests de parse de connexion exigent l'authentification `trust` PostgreSQL
 - Les tests se connectent en rôles non-superuser (`app_user`/`app_admin`) : une requête sans contexte tenant renvoie 0 ligne (RLS) et un insert cross-tenant lève 42501 — comportement attendu et testé, ne pas « corriger » en passant en superuser

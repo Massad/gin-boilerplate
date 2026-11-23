@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 func middlewareTestSetup(t *testing.T) *models.AuthModel {
@@ -28,9 +29,7 @@ func middlewareTestSetup(t *testing.T) *models.AuthModel {
 	gin.SetMode(gin.TestMode)
 	db.InitRedis(1)
 	t.Cleanup(func() { _ = db.GetRedis().Close() })
-	if err := db.GetRedis().Ping().Err(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, db.GetRedis().Ping().Err())
 	return new(models.AuthModel)
 }
 
@@ -39,12 +38,8 @@ func TestAccessTokenRejectedAfterLogout(t *testing.T) {
 	userID := uuid.New()
 	tenantID := uuid.New()
 	tokens, err := auth.CreateToken(userID, tenantID, "owner")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := auth.CreateAuth(userID, tenantID, "owner", tokens); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, auth.CreateAuth(userID, tenantID, "owner", tokens))
 	t.Cleanup(func() { db.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 	r := gin.New()
 	r.GET("/protected", middleware.TokenAuth(), func(c *gin.Context) {
@@ -68,16 +63,14 @@ func TestAccessTokenRejectedAfterLogout(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
-		if w.Code != step.status {
-			t.Fatalf("%s returned %d, want %d", step.path, w.Code, step.status)
-		}
+		require.Equal(t, step.status, w.Code, "%s status mismatch", step.path)
 	}
 	// JWT signature and expiry remain valid: rejection must come from Redis.
 	req := httptest.NewRequest("GET", "/protected", nil)
 	req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
-	if token, err := auth.VerifyToken(req); err != nil || !token.Valid {
-		t.Fatalf("test token unexpectedly invalid: %v", err)
-	}
+	token, err := auth.VerifyToken(req)
+	require.NoError(t, err, "test token unexpectedly invalid: %v", err)
+	require.True(t, token.Valid, "test token unexpectedly invalid")
 }
 
 func TestTokenAuthExposesTenantClaims(t *testing.T) {
@@ -85,12 +78,8 @@ func TestTokenAuthExposesTenantClaims(t *testing.T) {
 	userID := uuid.New()
 	tenantID := uuid.New()
 	tokens, err := auth.CreateToken(userID, tenantID, "member")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := auth.CreateAuth(userID, tenantID, "member", tokens); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, auth.CreateAuth(userID, tenantID, "member", tokens))
 	t.Cleanup(func() { db.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 
 	var gotUserID, gotTenantID, gotRole string
@@ -105,24 +94,18 @@ func TestTokenAuthExposesTenantClaims(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
-	}
-	if gotUserID != userID.String() || gotTenantID != tenantID.String() || gotRole != "member" {
-		t.Fatalf("context claims = (%s, %s, %s), want (%s, %s, member)", gotUserID, gotTenantID, gotRole, userID, tenantID)
-	}
+	require.Equal(t, http.StatusOK, w.Code, "protected route status mismatch")
+	require.Equal(t, userID.String(), gotUserID, "userID claim mismatch")
+	require.Equal(t, tenantID.String(), gotTenantID, "tenantID claim mismatch")
+	require.Equal(t, "member", gotRole, "role claim mismatch")
 }
 
 func TestTokenAuthRejectsAdminToken(t *testing.T) {
 	auth := middlewareTestSetup(t)
 	adminID := uuid.New()
 	adminTokens, err := auth.CreateAdminToken(adminID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := auth.CreateAdminAuth(adminID, adminTokens); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, auth.CreateAdminAuth(adminID, adminTokens))
 	t.Cleanup(func() { db.GetRedis().Del("admin:" + adminTokens.AccessUUID) })
 
 	r := gin.New()
@@ -131,9 +114,7 @@ func TestTokenAuthRejectsAdminToken(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+adminTokens.AccessToken)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("admin token passed TokenAuth: %d, want 401", w.Code)
-	}
+	require.Equal(t, http.StatusUnauthorized, w.Code, "admin token must not pass TokenAuth")
 }
 
 func TestAdminAuthRejectsTenantToken(t *testing.T) {
@@ -141,12 +122,8 @@ func TestAdminAuthRejectsTenantToken(t *testing.T) {
 	userID := uuid.New()
 	tenantID := uuid.New()
 	tokens, err := auth.CreateToken(userID, tenantID, "owner")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := auth.CreateAuth(userID, tenantID, "owner", tokens); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, auth.CreateAuth(userID, tenantID, "owner", tokens))
 	t.Cleanup(func() { db.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 
 	r := gin.New()
@@ -155,21 +132,15 @@ func TestAdminAuthRejectsTenantToken(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("tenant token passed AdminAuth: %d, want 401", w.Code)
-	}
+	require.Equal(t, http.StatusUnauthorized, w.Code, "tenant token must not pass AdminAuth")
 }
 
 func TestAdminAuthAcceptsAdminToken(t *testing.T) {
 	auth := middlewareTestSetup(t)
 	adminID := uuid.New()
 	adminTokens, err := auth.CreateAdminToken(adminID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := auth.CreateAdminAuth(adminID, adminTokens); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, auth.CreateAdminAuth(adminID, adminTokens))
 	t.Cleanup(func() { db.GetRedis().Del("admin:" + adminTokens.AccessUUID) })
 
 	var gotAdminID string
@@ -182,12 +153,8 @@ func TestAdminAuthAcceptsAdminToken(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+adminTokens.AccessToken)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
-	}
-	if gotAdminID != adminID.String() {
-		t.Fatalf("adminID = %s, want %s", gotAdminID, adminID)
-	}
+	require.Equal(t, http.StatusOK, w.Code, "admin route status mismatch")
+	require.Equal(t, adminID.String(), gotAdminID, "adminID claim mismatch")
 }
 
 func TestRequirePermission(t *testing.T) {
@@ -217,9 +184,7 @@ func TestRequirePermission(t *testing.T) {
 			req := httptest.NewRequest("GET", "/manage", nil)
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, req)
-			if w.Code != tc.status {
-				t.Fatalf("role %q: status = %d, want %d", tc.role, w.Code, tc.status)
-			}
+			require.Equal(t, tc.status, w.Code, "role %q status mismatch", tc.role)
 		})
 	}
 }
@@ -236,9 +201,7 @@ func TestTokenAuthRejectsTokenWithoutRole(t *testing.T) {
 		"user_id":     userID.String(),
 		"exp":         4102444800,
 	}).SignedString([]byte(os.Getenv("ACCESS_SECRET")))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	_ = tenantID
 	r := gin.New()
 	r.GET("/protected", middleware.TokenAuth(), func(c *gin.Context) { c.Status(http.StatusOK) })
@@ -246,7 +209,5 @@ func TestTokenAuthRejectsTokenWithoutRole(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("token without role claim passed: %d, want 401", w.Code)
-	}
+	require.Equal(t, http.StatusUnauthorized, w.Code, "token without role claim must not pass TokenAuth")
 }

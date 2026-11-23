@@ -15,4 +15,5 @@ cert/
 
 # BUILD #
 /gin-boilerplate
+/gin-boilerplate.exe
 .cache/tools/

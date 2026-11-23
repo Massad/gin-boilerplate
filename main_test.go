@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
 	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -25,36 +27,25 @@ func TestRunCreateAdmin(t *testing.T) {
 		t.Skip("set DB_HOST/DB_ADMIN_USER to an isolated PostgreSQL instance")
 	}
 
-	email := "bootstrap-admin@test.com"
-	firstPassword := "first-bootstrap-password"
-	secondPassword := "second-bootstrap-password"
+	email, password := testutil.NewAdminFixture(t)
+	// The CLI idempotently rotates the stored hash: the last password wins.
+	firstPassword := password
+	secondPassword := password + "-rotated"
 	ctx := context.Background()
 
-	if err := runCreateAdmin(ctx, os.Getenv, email, firstPassword); err != nil {
-		t.Fatalf("first bootstrap failed: %v", err)
-	}
-	if err := runCreateAdmin(ctx, os.Getenv, email, secondPassword); err != nil {
-		t.Fatalf("second bootstrap must succeed (idempotent): %v", err)
-	}
+	require.NoError(t, runCreateAdmin(ctx, os.Getenv, email, firstPassword), "first bootstrap failed")
+	require.NoError(t, runCreateAdmin(ctx, os.Getenv, email, secondPassword), "second bootstrap must succeed (idempotent)")
 
 	// runCreateAdmin closed its pools: reconnect to verify the stored hash.
-	if err := pgdb.InitAdmin(ctx, os.Getenv); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, pgdb.InitAdmin(ctx, os.Getenv))
 	defer pgdb.Close()
 	row, err := pgdb.AdminStore().GetAdminByEmail(ctx, email)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := bcrypt.CompareHashAndPassword([]byte(row.Password), []byte(secondPassword)); err != nil {
-		t.Fatalf("stored hash does not match the last bootstrap password: %v", err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, bcrypt.CompareHashAndPassword([]byte(row.Password), []byte(secondPassword)), "stored hash must match the last bootstrap password")
 	t.Cleanup(func() {
 		pgdb.AdminStore().Pool.Exec(context.Background(), "DELETE FROM public.admin_user WHERE email=$1", email)
 	})
 
 	// Missing arguments fail without touching the database.
-	if err := runCreateAdmin(ctx, os.Getenv, "", secondPassword); err == nil {
-		t.Fatal("empty email must be rejected")
-	}
+	require.Error(t, runCreateAdmin(ctx, os.Getenv, "", secondPassword), "empty email must be rejected")
 }
