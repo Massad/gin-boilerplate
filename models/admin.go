@@ -13,25 +13,34 @@ import (
 // AdminModel ...
 type AdminModel struct{}
 
+// AdminIdentity is the superadmin identity verified at login time. It is
+// embedded in the unified login response.
+type AdminIdentity struct {
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
+	Name  string    `json:"name"`
+}
+
 // Login verifies the superadmin credentials on the platform pool and returns
-// the admin id on success.
-func (m AdminModel) Login(email, password string) (uuid.UUID, error) {
+// the admin identity on success.
+func (m AdminModel) Login(email, password string) (AdminIdentity, error) {
 	row, err := pgdb.AdminStore().GetAdminByEmail(context.Background(), strings.ToLower(strings.TrimSpace(email)))
 	if err != nil {
-		return uuid.Nil, err
+		return AdminIdentity{}, err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(row.Password), []byte(password)); err != nil {
-		return uuid.Nil, err
+		return AdminIdentity{}, err
 	}
-	return row.ID, nil
+	return AdminIdentity{ID: row.ID, Email: row.Email, Name: row.Name}, nil
 }
 
 // Create stores a superadmin (the CLI bootstrap idempotently resets the
-// password of an existing admin).
-func (m AdminModel) Create(email string, passwordHash string) (uuid.UUID, error) {
+// password and the name of an existing admin).
+func (m AdminModel) Create(email string, passwordHash string, name string) (uuid.UUID, error) {
 	return pgdb.AdminStore().CreateAdmin(context.Background(), pgdb.CreateAdminParams{
 		Email:    strings.ToLower(strings.TrimSpace(email)),
 		Password: passwordHash,
+		Name:     name,
 	})
 }
 

@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Connexion — Plateforme multi-tenant</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-warm: var(--surface);
+  --fg: #111827;
+  --fg-2: var(--fg);
+  --muted: #64748b;
+  --meta: var(--muted);
+  --border: #e5e7eb;
+  --border-soft: var(--border);
+  --accent: #000000;
+  --accent-on: #ffffff;
+  --accent-hover: color-mix(in oklab, var(--accent), white 10%);
+  --accent-active: color-mix(in oklab, var(--accent), white 18%);
+  --success: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --font-display: "Geist", "Geist Sans", -apple-system, system-ui, "Segoe UI", Arial, sans-serif;
+  --font-body: "Geist", "Geist Sans", -apple-system, system-ui, "Segoe UI", Arial, sans-serif;
+  --font-mono: "Fira Code", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 40px;
+  --text-4xl: 48px;
+  --leading-body: 1.5;
+  --leading-tight: 1.2;
+  --tracking-display: -0.02em;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised:
+    0 1px 2px 0 color-mix(in oklab, var(--fg), transparent 92%),
+    0 1px 3px 0 color-mix(in oklab, var(--fg), transparent 88%);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --container-max: 1280px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+a:hover { color: var(--accent); }
+a:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+
+/* ── Layout: two-pane ─────────────────────────────────────────── */
+.shell {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+}
+@media (max-width: 680px) {
+  .shell { grid-template-columns: 1fr; }
+}
+
+/* ── Brand pane ───────────────────────────────────────────────── */
+.brand-pane {
+  position: relative;
+  background: var(--fg);
+  color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-12);
+  overflow: hidden;
+}
+@media (max-width: 680px) {
+  .brand-pane { display: none; }
+}
+.brand-pane::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 500px at 80% -10%, color-mix(in oklab, var(--fg), white 12%) 0%, transparent 60%),
+    radial-gradient(600px 400px at -10% 110%, color-mix(in oklab, var(--fg), white 8%) 0%, transparent 55%);
+  pointer-events: none;
+}
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
+  position: relative;
+  z-index: 1;
+}
+.brand-mark .logo-dot {
+  width: 28px; height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  display: grid; place-items: center;
+}
+.brand-mark .logo-dot::after {
+  content: "";
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  background: var(--fg);
+}
+.brand-hero {
+  position: relative;
+  z-index: 1;
+  max-width: 460px;
+}
+.brand-hero h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-4xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  margin-bottom: var(--space-4);
+}
+.brand-hero p {
+  font-size: var(--text-lg);
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+.brand-quote {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid color-mix(in oklab, var(--fg), white 14%);
+  padding-top: var(--space-6);
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+.brand-quote .avatar {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--fg), white 16%);
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  font-weight: 600; font-size: var(--text-sm);
+  color: #f8fafc;
+}
+.brand-quote blockquote {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: #e2e8f0;
+}
+.brand-quote cite {
+  display: block;
+  margin-top: var(--space-2);
+  font-style: normal;
+  font-size: var(--text-xs);
+  color: #94a3b8;
+}
+
+/* ── Form pane ────────────────────────────────────────────────── */
+.form-pane {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--container-gutter-desktop, 24px);
+}
+.form-card {
+  width: 100%;
+  max-width: 408px;
+}
+.form-head { margin-bottom: var(--space-8); }
+.form-head h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  margin-bottom: var(--space-2);
+}
+.form-head p {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* ── Tenant selector ──────────────────────────────────────────── */
+.tenant-field { margin-bottom: var(--space-5); }
+.tenant-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-2);
+}
+.tenant-label label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.tenant-label a {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.tenant-label a:hover { color: var(--accent); }
+
+.tenant-select {
+  position: relative;
+}
+.tenant-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-standard);
+}
+.tenant-trigger:hover { border-color: color-mix(in oklab, var(--border), var(--fg) 24%); }
+.tenant-trigger:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.tenant-trigger .org-glyph {
+  width: 26px; height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--fg);
+  color: var(--accent-on);
+  display: grid; place-items: center;
+  font-weight: 600; font-size: 12px;
+  flex-shrink: 0;
+}
+.tenant-trigger .org-name { flex: 1; font-weight: 500; }
+.tenant-trigger .org-domain {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+}
+.tenant-trigger .chev {
+  width: 16px; height: 16px;
+  color: var(--muted);
+  transition: transform var(--motion-base) var(--ease-standard);
+}
+.tenant-select[data-open="true"] .chev { transform: rotate(180deg); }
+
+.tenant-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--elev-raised);
+  padding: var(--space-1);
+  z-index: 20;
+  max-height: 280px;
+  overflow-y: auto;
+  display: none;
+}
+.tenant-select[data-open="true"] .tenant-menu { display: block; }
+.tenant-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+.tenant-option:hover,
+.tenant-option:focus-visible {
+  background: color-mix(in oklab, var(--fg), transparent 94%);
+  outline: none;
+}
+.tenant-option[aria-selected="true"] {
+  background: color-mix(in oklab, var(--fg), transparent 90%);
+}
+.tenant-option .org-glyph { width: 24px; height: 24px; font-size: 11px; }
+.tenant-option .org-info { flex: 1; min-width: 0; }
+.tenant-option .org-info .org-name {
+  font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tenant-option .org-info .org-domain {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+.tenant-option .check {
+  width: 16px; height: 16px;
+  color: var(--accent);
+  opacity: 0;
+}
+.tenant-option[aria-selected="true"] .check { opacity: 1; }
+
+/* ── Form fields ──────────────────────────────────────────────── */
+.field { margin-bottom: var(--space-5); }
+.field > label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-2);
+}
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-wrap .input-icon {
+  position: absolute;
+  left: var(--space-3);
+  width: 18px; height: 18px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.field input[type="email"],
+.field input[type="password"],
+.field input[type="text"] {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  padding-left: calc(var(--space-3) * 2 + 18px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--fg);
+  transition: border-color var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-standard);
+}
+.field input::placeholder { color: var(--muted); }
+.field input:hover { border-color: color-mix(in oklab, var(--border), var(--fg) 24%); }
+.field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.field textarea:hover { border-color: color-mix(in oklab, var(--border), var(--fg) 24%); }
+.field textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.field textarea::placeholder { color: var(--muted); }
+.pwd-toggle {
+  position: absolute;
+  right: var(--space-2);
+  display: grid; place-items: center;
+  width: 32px; height: 32px;
+  border: none; background: transparent;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard),
+              background var(--motion-fast) var(--ease-standard);
+}
+.pwd-toggle:hover { color: var(--fg); background: color-mix(in oklab, var(--fg), transparent 94%); }
+.pwd-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.pwd-toggle svg { width: 18px; height: 18px; }
+
+/* ── Row: remember + forgot ───────────────────────────────────── */
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+}
+.checkbox input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard),
+              border-color var(--motion-fast) var(--ease-standard);
+}
+.checkbox input:hover { border-color: color-mix(in oklab, var(--border), var(--fg) 30%); }
+.checkbox input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.checkbox input:checked::after {
+  content: "";
+  width: 10px; height: 6px;
+  border-left: 2px solid var(--accent-on);
+  border-bottom: 2px solid var(--accent-on);
+  transform: rotate(-45deg) translateY(-1px);
+}
+.checkbox input:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.row-between > a {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.row-between > a:hover { color: var(--accent); }
+
+/* ── Primary submit ───────────────────────────────────────────── */
+.btn-primary {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-on);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-standard);
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:active { background: var(--accent-active); }
+.btn-primary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn-primary .spinner {
+  display: none;
+  width: 16px; height: 16px;
+  border: 2px solid color-mix(in oklab, var(--accent-on), transparent 70%);
+  border-top-color: var(--accent-on);
+  border-radius: var(--radius-pill);
+  animation: spin 0.7s linear infinite;
+}
+.btn-primary[aria-busy="true"] .spinner { display: block; }
+.btn-primary[aria-busy="true"] .btn-label { opacity: 0.7; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Divider ──────────────────────────────────────────────────── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-6) 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── SSO secondary button ─────────────────────────────────────── */
+.btn-secondary {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard),
+              border-color var(--motion-fast) var(--ease-standard);
+}
+.btn-secondary:hover {
+  background: color-mix(in oklab, var(--fg), transparent 96%);
+  border-color: color-mix(in oklab, var(--border), var(--fg) 24%);
+}
+.btn-secondary:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn-secondary .sso-glyph {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+}
+
+/* ── Footer links ─────────────────────────────────────────────── */
+.form-foot {
+  margin-top: var(--space-8);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.form-foot a {
+  color: var(--fg);
+  font-weight: 500;
+}
+.form-foot a:hover { color: var(--accent); }
+
+/* ── Error banner ─────────────────────────────────────────────── */
+.error-banner {
+  display: none;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in oklab, var(--danger), white 70%);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--danger), white 96%);
+  color: color-mix(in oklab, var(--danger), var(--fg) 30%);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-5);
+}
+.error-banner[data-show="true"] { display: flex; }
+.error-banner svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Mobile brand bar ─────────────────────────────────────────── */
+.mobile-brand {
+  display: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--container-gutter-phone, 16px);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-base);
+}
+.mobile-brand .logo-dot {
+  width: 26px; height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--fg);
+  display: grid; place-items: center;
+}
+.mobile-brand .logo-dot::after {
+  content: ""; width: 11px; height: 11px;
+  border-radius: 3px; background: var(--bg);
+}
+@media (max-width: 680px) {
+  .mobile-brand { display: flex; }
+  .form-pane { padding-top: 0; align-items: flex-start; }
+  .form-card { margin-top: var(--space-6); }
+}
+@media (max-width: 520px) {
+  .brand-pane, .form-pane { padding-left: var(--container-gutter-phone, 16px); padding-right: var(--container-gutter-phone, 16px); }
+}
+
+/* ── View switching ───────────────────────────────────────────── */
+.form-card[hidden] { display: none; }
+
+/* ── Back link ─────────────────────────────────────────────────── */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin-bottom: var(--space-5);
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+.back-link svg { width: 16px; height: 16px; }
+.back-link:hover { color: var(--accent); }
+.back-link:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+
+/* ── Subdomain field ───────────────────────────────────────────── */
+.slug-wrap {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition: border-color var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-standard);
+}
+.slug-wrap .input-wrap { flex: 1; min-width: 0; }
+.slug-wrap .input-wrap .field input,
+.slug-wrap input[type="text"] {
+  border: none;
+  border-radius: 0;
+}
+.slug-wrap input[type="text"]:focus-visible {
+  box-shadow: none;
+}
+.slug-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.slug-suffix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  border-left: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/* slug input should not keep the left padding from .field input rule
+   since it lives inside .slug-wrap; reset it to normal field padding */
+.slug-wrap input[type="text"] {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  padding-left: calc(var(--space-3) * 2 + 18px);
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+/* ── Field help text ───────────────────────────────────────────── */
+.field-help {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.field-help span {
+  font-family: var(--font-mono);
+  color: var(--fg-2);
+}
+
+/* ── Terms checkbox ────────────────────────────────────────────── */
+.checkbox.terms {
+  align-items: flex-start;
+  margin-bottom: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  line-height: 1.5;
+}
+.checkbox.terms input { margin-top: 2px; flex-shrink: 0; }
+.checkbox.terms a { color: var(--fg); font-weight: 500; }
+.checkbox.terms a:hover { color: var(--accent); }
+.checkbox.terms a:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+</style>
+</head>
+<body data-od-root>
+  <div class="shell" data-od-id="login-shell">
+
+    <!-- Brand pane -->
+    <aside class="brand-pane" data-od-id="brand-pane">
+      <div class="brand-mark">
+        <span class="logo-dot" aria-hidden="true"></span>
+        <span>Atrium</span>
+      </div>
+
+      <div class="brand-hero">
+        <h1>Un accès, tous vos espaces de travail.</h1>
+        <p>Atrium regroupe vos organisations, équipes et projets dans une plateforme unique et sécurisée.</p>
+      </div>
+
+      <div class="brand-quote">
+        <div class="avatar" aria-hidden="true">LM</div>
+        <div>
+          <blockquote>« Nous avons centralisé six tenants en une seule interface. L'onboarding des nouvelles équipes a chuté de trois jours à vingt minutes. »</blockquote>
+          <cite>Laure Moreau — Directrice des opérations, Studio Nord</cite>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Form pane -->
+    <main class="form-pane">
+      <div class="form-card" data-od-id="login-card">
+
+        <div class="mobile-brand">
+          <span class="logo-dot" aria-hidden="true"></span>
+          <span>Atrium</span>
+        </div>
+
+        <header class="form-head">
+          <h2>Connexion</h2>
+          <p>Signez avec vos identifiants — vous serez redirigé vers votre espace.</p>
+        </header>
+
+        <!-- Error banner -->
+        <div class="error-banner" role="alert" data-od-id="login-error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Adresse e-mail ou mot de passe incorrect. Vérifiez vos identifiants et réessayez.</span>
+        </div>
+
+        <form id="loginForm" novalidate>
+
+          <!-- Email -->
+          <div class="field">
+            <label for="email">Adresse e-mail</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+              <input type="email" id="email" name="email" placeholder="vous@exemple.com" autocomplete="email" required />
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div class="field">
+            <label for="password">Mot de passe</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="password" name="password" placeholder="Votre mot de passe" autocomplete="current-password" required />
+              <button type="button" class="pwd-toggle" aria-label="Afficher le mot de passe" data-od-id="pwd-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Remember + forgot -->
+          <div class="row-between">
+            <label class="checkbox">
+              <input type="checkbox" id="remember" name="remember" />
+              <span>Rester connecté</span>
+            </label>
+            <a href="#" data-od-id="forgot-link">Mot de passe oublié ?</a>
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" class="btn-primary" data-od-id="login-submit">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-label">Se connecter</span>
+          </button>
+
+          <!-- SSO -->
+          <div class="divider">ou continuer avec</div>
+          <button type="button" class="btn-secondary" data-od-id="sso-button">
+            <svg class="sso-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            <span>Authentification unique (SSO)</span>
+          </button>
+        </form>
+
+        <p class="form-foot">
+          Pas encore de compte ? <a href="#" data-od-id="signup-link">Demander un accès</a><br />
+          <a href="#" id="tenantHelp" data-od-id="tenant-help-link">Créer une organisation</a>
+        </p>
+      </div>
+
+      <!-- Create organization view -->
+      <div class="form-card" id="createOrgCard" data-od-id="create-org-card" hidden>
+        <div class="mobile-brand">
+          <span class="logo-dot" aria-hidden="true"></span>
+          <span>Atrium</span>
+        </div>
+
+        <header class="form-head">
+          <a href="#" class="back-link" data-od-id="back-to-login">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            <span>Retour à la connexion</span>
+          </a>
+          <h2>Créer une organisation</h2>
+          <p>Créez l'espace de travail de votre société sur Atrium.</p>
+        </header>
+
+        <div class="error-banner" role="alert" data-od-id="create-org-error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Veuillez renseigner tous les champs obligatoires.</span>
+        </div>
+
+        <form id="createOrgForm" novalidate>
+          <div class="field">
+            <label for="orgName">Nom de la société</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+              <input type="text" id="orgName" name="orgName" placeholder="Studio Nord" autocomplete="organization" required />
+            </div>
+            <p class="field-help" id="slugPreview">Votre espace sera accessible sur <span id="slugPreviewUrl">domain.com/studio-nord</span></p>
+          </div>
+
+          <div class="field">
+            <label for="adminEmail">E-mail de l'administrateur</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+              <input type="email" id="adminEmail" name="adminEmail" placeholder="vous@exemple.com" autocomplete="email" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="adminPassword">Mot de passe</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="adminPassword" name="adminPassword" placeholder="Créez un mot de passe" autocomplete="new-password" required />
+              <button type="button" class="pwd-toggle" aria-label="Afficher le mot de passe" data-od-id="pwd-toggle-create">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <label class="checkbox terms">
+            <input type="checkbox" id="agreeTerms" name="agreeTerms" required />
+            <span>J'accepte les <a href="#" data-od-id="terms-link">conditions d'utilisation</a> et la <a href="#" data-od-id="privacy-link">politique de confidentialité</a>.</span>
+          </label>
+
+          <button type="submit" class="btn-primary" data-od-id="create-org-submit">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-label">Créer l'organisation</span>
+          </button>
+        </form>
+
+        <p class="form-foot">
+          Vous avez déjà une organisation ? <a href="#" data-od-id="back-to-login-foot">Se connecter</a>
+        </p>
+      </div>
+
+      <!-- Request access view -->
+      <div class="form-card" id="requestAccessCard" data-od-id="request-access-card" hidden>
+        <div class="mobile-brand">
+          <span class="logo-dot" aria-hidden="true"></span>
+          <span>Atrium</span>
+        </div>
+
+        <header class="form-head">
+          <a href="#" class="back-link" data-od-id="back-to-login-access">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            <span>Retour à la connexion</span>
+          </a>
+          <h2>Demander un accès</h2>
+          <p>Sollicitez une invitation auprès de l'administrateur d'une organisation existante.</p>
+        </header>
+
+        <div class="error-banner" role="alert" data-od-id="request-access-error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Veuillez renseigner tous les champs obligatoires.</span>
+        </div>
+
+        <form id="requestAccessForm" novalidate>
+          <div class="field">
+            <label for="reqName">Nom complet</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <input type="text" id="reqName" name="reqName" placeholder="Camille Laurent" autocomplete="name" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="reqEmail">Adresse e-mail professionnelle</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+              <input type="email" id="reqEmail" name="reqEmail" placeholder="vous@entreprise.com" autocomplete="email" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="reqOrg">Nom de l'organisation</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+              <input type="text" id="reqOrg" name="reqOrg" placeholder="Studio Nord" autocomplete="organization" required />
+            </div>
+            <p class="field-help">Indiquez l'organisation à laquelle vous souhaitez joindre. L'administrateur recevra votre demande.</p>
+          </div>
+
+          <div class="field">
+            <label for="reqMessage">Message à l'administrateur <span style="font-weight:400;color:var(--muted)">(facultatif)</span></label>
+            <div class="input-wrap">
+              <textarea id="reqMessage" name="reqMessage" rows="3" placeholder="Précisez votre rôle et le motif de votre demande…" style="width:100%;padding:var(--space-3) var(--space-4);padding-left:calc(var(--space-3) * 2 + 18px);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-family:var(--font-body);font-size:var(--text-sm);color:var(--fg);resize:vertical;transition:border-color var(--motion-fast) var(--ease-standard),box-shadow var(--motion-fast) var(--ease-standard)" data-od-id="req-message"></textarea>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" data-od-id="request-access-submit">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-label">Envoyer la demande</span>
+          </button>
+        </form>
+
+        <p class="form-foot">
+          Vous administrez une organisation ? <a href="#" data-od-id="back-to-login-access-foot">Se connecter</a><br />
+          <a href="#" id="tenantHelpAccess" data-od-id="tenant-help-link-access">Créer une organisation</a>
+        </p>
+      </div>
+
+      <!-- Forgot password view -->
+      <div class="form-card" id="forgotCard" data-od-id="forgot-card" hidden>
+        <div class="mobile-brand">
+          <span class="logo-dot" aria-hidden="true"></span>
+          <span>Atrium</span>
+        </div>
+
+        <header class="form-head">
+          <a href="#" class="back-link" data-od-id="back-to-login-forgot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            <span>Retour à la connexion</span>
+          </a>
+          <h2>Mot de passe oublié</h2>
+          <p>Saisissez votre adresse e-mail — nous vous enverrons un lien de réinitialisation.</p>
+        </header>
+
+        <div class="error-banner" role="alert" data-od-id="forgot-error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Veuillez renseigner votre adresse e-mail.</span>
+        </div>
+
+        <form id="forgotForm" novalidate>
+          <div class="field">
+            <label for="forgotEmail">Adresse e-mail</label>
+            <div class="input-wrap">
+              <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+              <input type="email" id="forgotEmail" name="forgotEmail" placeholder="vous@exemple.com" autocomplete="email" required />
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" data-od-id="forgot-submit">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-label">Envoyer le lien de réinitialisation</span>
+          </button>
+        </form>
+
+        <p class="form-foot">
+          Vous vous souvenez de votre mot de passe ? <a href="#" data-od-id="back-to-login-forgot-foot">Se connecter</a>
+        </p>
+      </div>
+    </main>
+  </div>
+
+<script>
+(function () {
+  // Password toggle
+  var pwd = document.getElementById('password');
+  var pwdToggle = document.querySelector('[data-od-id="pwd-toggle"]');
+  pwdToggle.addEventListener('click', function () {
+    var isPwd = pwd.type === 'password';
+    pwd.type = isPwd ? 'text' : 'password';
+    pwdToggle.setAttribute('aria-label', isPwd ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+  });
+
+  // Submit
+  var form = document.getElementById('loginForm');
+  var errorBanner = document.querySelector('[data-od-id="login-error"]');
+  var submitBtn = document.querySelector('[data-od-id="login-submit"]');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = document.getElementById('email').value.trim();
+    var password = pwd.value;
+    errorBanner.setAttribute('data-show', 'false');
+    if (!email || !password) {
+      errorBanner.setAttribute('data-show', 'true');
+      return;
+    }
+    submitBtn.setAttribute('aria-busy', 'true');
+    setTimeout(function () {
+      submitBtn.setAttribute('aria-busy', 'false');
+      errorBanner.setAttribute('data-show', 'true');
+    }, 1400);
+  });
+
+  document.getElementById('email').addEventListener('input', function () {
+    errorBanner.setAttribute('data-show', 'false');
+  });
+  pwd.addEventListener('input', function () {
+    errorBanner.setAttribute('data-show', 'false');
+  });
+
+  // ── View switching: login <-> create organization <-> request access ──
+  var loginCard = document.querySelector('[data-od-id="login-card"]');
+  var createOrgCard = document.getElementById('createOrgCard');
+  var requestAccessCard = document.getElementById('requestAccessCard');
+  var forgotCard = document.getElementById('forgotCard');
+  var docTitle = document.title;
+
+  function showView(view) {
+    loginCard.hidden = view !== 'login';
+    createOrgCard.hidden = view !== 'create';
+    requestAccessCard.hidden = view !== 'request';
+    forgotCard.hidden = view !== 'forgot';
+    if (view === 'create') {
+      document.title = 'Créer une organisation — Plateforme multi-tenant';
+      var firstInput = document.getElementById('orgName');
+      if (firstInput) firstInput.focus();
+    } else if (view === 'request') {
+      document.title = 'Demander un accès — Plateforme multi-tenant';
+      var reqFirst = document.getElementById('reqName');
+      if (reqFirst) reqFirst.focus();
+    } else if (view === 'forgot') {
+      document.title = 'Mot de passe oublié — Plateforme multi-tenant';
+      var forgotFirst = document.getElementById('forgotEmail');
+      if (forgotFirst) forgotFirst.focus();
+    } else {
+      document.title = docTitle;
+    }
+  }
+
+  document.getElementById('tenantHelp').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('create');
+  });
+  document.getElementById('tenantHelpAccess').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('create');
+  });
+  document.querySelector('[data-od-id="back-to-login"]').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('login');
+  });
+  document.querySelector('[data-od-id="back-to-login-foot"]').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('login');
+  });
+  document.querySelector('[data-od-id="back-to-login-access"]').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('login');
+  });
+  document.querySelector('[data-od-id="back-to-login-access-foot"]').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('login');
+  });
+
+  // ── Request access: "Pas encore de compte ? Demander un accès" link ──
+  document.querySelector('[data-od-id="signup-link"]').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('request');
+  });
+
+  // ── Forgot password links ──────────────────────────────────────
+  document.querySelector('[data-od-id="forgot-link"]').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('forgot');
+  });
+  document.querySelector('[data-od-id="back-to-login-forgot"]').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('login');
+  });
+  document.querySelector('[data-od-id="back-to-login-forgot-foot"]').addEventListener('click', function (e) {
+    e.preventDefault();
+    showView('login');
+  });
+
+  // ── Forgot password submit ─────────────────────────────────────
+  var forgotForm = document.getElementById('forgotForm');
+  var forgotError = document.querySelector('[data-od-id="forgot-error"]');
+  var forgotBtn = document.querySelector('[data-od-id="forgot-submit"]');
+  var forgotLabel = forgotBtn.querySelector('.btn-label');
+  var forgotLabelOriginal = forgotLabel.textContent;
+  forgotError.setAttribute('data-show', 'false');
+  forgotForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = document.getElementById('forgotEmail').value.trim();
+    forgotError.setAttribute('data-show', 'false');
+    if (!email) {
+      forgotError.setAttribute('data-show', 'true');
+      return;
+    }
+    forgotBtn.setAttribute('aria-busy', 'true');
+    setTimeout(function () {
+      forgotBtn.setAttribute('aria-busy', 'false');
+      forgotForm.reset();
+      forgotLabel.textContent = 'Lien envoyé — vérifiez votre boîte de réception';
+      setTimeout(function () {
+        forgotLabel.textContent = forgotLabelOriginal;
+      }, 3200);
+    }, 1400);
+  });
+  document.getElementById('forgotEmail').addEventListener('input', function () {
+    forgotError.setAttribute('data-show', 'false');
+  });
+
+  // ── URL preview derived from company name ──────────────────────
+  var orgNameInput = document.getElementById('orgName');
+  var slugPreviewUrl = document.getElementById('slugPreviewUrl');
+  function slugify(val) {
+    return val.toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+  orgNameInput.addEventListener('input', function () {
+    var slug = slugify(orgNameInput.value) || 'votre-societe';
+    slugPreviewUrl.textContent = 'domain.com/' + slug;
+  });
+
+  // ── Create-org password toggle ──────────────────────────────────
+  var createPwd = document.getElementById('adminPassword');
+  var pwdToggleCreate = document.querySelector('[data-od-id="pwd-toggle-create"]');
+  pwdToggleCreate.addEventListener('click', function () {
+    var isPwd = createPwd.type === 'password';
+    createPwd.type = isPwd ? 'text' : 'password';
+    pwdToggleCreate.setAttribute('aria-label', isPwd ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+  });
+
+  // ── Create-org submit ───────────────────────────────────────────
+  var createForm = document.getElementById('createOrgForm');
+  var createError = document.querySelector('[data-od-id="create-org-error"]');
+  var createBtn = document.querySelector('[data-od-id="create-org-submit"]');
+  createError.setAttribute('data-show', 'false');
+  createForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = document.getElementById('orgName').value.trim();
+    var email = document.getElementById('adminEmail').value.trim();
+    var password = createPwd.value;
+    var terms = document.getElementById('agreeTerms').checked;
+    createError.setAttribute('data-show', 'false');
+    if (!name || !email || !password || !terms) {
+      createError.setAttribute('data-show', 'true');
+      return;
+    }
+    createBtn.setAttribute('aria-busy', 'true');
+    setTimeout(function () {
+      createBtn.setAttribute('aria-busy', 'false');
+    }, 1400);
+  });
+  ['orgName', 'adminEmail', 'adminPassword', 'agreeTerms'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () {
+      createError.setAttribute('data-show', 'false');
+    });
+    document.getElementById(id).addEventListener('change', function () {
+      createError.setAttribute('data-show', 'false');
+    });
+  });
+  // ── Request access submit ────────────────────────────────────────
+  var reqForm = document.getElementById('requestAccessForm');
+  var reqError = document.querySelector('[data-od-id="request-access-error"]');
+  var reqBtn = document.querySelector('[data-od-id="request-access-submit"]');
+  reqError.setAttribute('data-show', 'false');
+  reqForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = document.getElementById('reqName').value.trim();
+    var email = document.getElementById('reqEmail').value.trim();
+    var org = document.getElementById('reqOrg').value.trim();
+    reqError.setAttribute('data-show', 'false');
+    if (!name || !email || !org) {
+      reqError.setAttribute('data-show', 'true');
+      return;
+    }
+    reqBtn.setAttribute('aria-busy', 'true');
+    setTimeout(function () {
+      reqBtn.setAttribute('aria-busy', 'false');
+      reqForm.reset();
+      reqBtn.querySelector('.btn-label').textContent = 'Demande envoyée';
+      setTimeout(function () {
+        reqBtn.querySelector('.btn-label').textContent = 'Envoyer la demande';
+      }, 2400);
+    }, 1400);
+  });
+  ['reqName', 'reqEmail', 'reqOrg', 'reqMessage'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () {
+      reqError.setAttribute('data-show', 'false');
+    });
+  });
+})();
+</script>
+</body>
+</html>

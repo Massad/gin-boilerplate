@@ -34,18 +34,18 @@ func (ctrl AdminController) Login(c *gin.Context) {
 		return
 	}
 
-	adminID, err := adminModel.Login(loginForm.Email, loginForm.Password)
+	admin, err := adminModel.Login(loginForm.Email, loginForm.Password)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid admin login details"})
 		return
 	}
 
-	tokenDetails, err := authModel.CreateAdminToken(adminID)
+	tokenDetails, err := authModel.CreateAdminToken(admin.ID)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Invalid admin login details"})
 		return
 	}
-	if err := authModel.CreateAdminAuth(adminID, tokenDetails); err != nil {
+	if err := authModel.CreateAdminAuth(admin.ID, tokenDetails); err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Invalid admin login details"})
 		return
 	}

@@ -7,6 +7,10 @@ SHELL := C:/Program Files/Git/bin/sh.exe
 endif
 endif
 
+## The targets never create a file named after themselves: they must always run.
+.PHONY: run test e2e migrate_up migrate_down generate_docs install_swag \
+	generate_sqlc install_sqlc generate_mocks install_mockery install_goose
+
 ## RUN APPLICATION
 run:
 	@echo -e "🚀 Running the application..."
@@ -44,7 +48,9 @@ generate_docs: install_swag
 	@"$(SWAG_BIN)" init
 	@echo -e "✅ API documentation generated successfully!"
 
-SQLC_VERSION := v1.27.0
+## v1.27.0 crashed at startup in this environment (old wazero wasm runtime
+## incompatible with the current Go toolchain); v1.30.0 vendors a fixed one.
+SQLC_VERSION := v1.30.0
 SQLC_BIN := $(CURDIR)/.cache/tools/sqlc/$(SQLC_VERSION)/sqlc
 
 ## INSTALL THE PINNED SQLC CLI
@@ -94,5 +100,35 @@ migrate_up: install_goose
 migrate_down: install_goose
 	@echo "Reverting the last database migration..."
 	@"$(GOOSE_BIN)" -dir db/migrations postgres "$(DB_DSN)" down
+
+## E2E DATABASE (recreated from scratch at every run of the e2e cycle)
+E2E_DB_NAME ?= artisan_e2e
+
+## THE FRONTEND COMMANDS RUN INSIDE app/ SO THAT COREPACK RESOLVES THE PINNED
+## packageManager VERSION (corepack reads the nearest package.json). From the
+## repository root, corepack resolves its default version instead, which the
+## pinned project refuses (ERR_PNPM_BAD_PM_VERSION). Override PNPM to use
+## another binary (PNPM=pnpm make e2e).
+PNPM ?= corepack pnpm
+
+## RUN THE END-TO-END CYCLE
+## - Recreates the e2e database and flushes the Redis database of the sessions.
+## - Applies the migrations as the migration superuser, then seeds the superadmin.
+## - Builds the frontend and runs the Playwright suite against the Go binary
+##   serving app/dist (single origin, port 9100).
+e2e:
+	@echo -e "🧪 Preparing the e2e database ($(E2E_DB_NAME))..."
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	DB_USER=postgres DB_PASS=postgres E2E_DB_NAME=$(E2E_DB_NAME) go run -mod=readonly ./cmd/e2edb
+	@echo -e "🗄️  Applying the migrations on $(E2E_DB_NAME)..."
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	"$(MAKE)" --no-print-directory SHELL="$(SHELL)" migrate_up DB_NAME=$(E2E_DB_NAME) DB_USER=postgres DB_PASS=postgres DB_HOST="$$DB_HOST" DB_PORT="$$DB_PORT" SSL="$$SSL"
+	@echo -e "👤 Seeding the e2e superadmin..."
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	DB_NAME=$(E2E_DB_NAME) go run -mod=readonly . -create-admin -email e2e-admin@atrium.dev -password e2e-admin-password-0 -name "Prénom Nom"
+	@echo -e "🏗️  Building the frontend..."
+	@cd app && $(PNPM) build
+	@echo -e "🎭 Running the Playwright suite..."
+	@cd app && E2E_DB_NAME=$(E2E_DB_NAME) $(PNPM) exec playwright test
 
 

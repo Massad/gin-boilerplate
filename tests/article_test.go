@@ -50,6 +50,7 @@ func SetupRouter() *gin.Engine {
 		/*** START AUTH ***/
 		auth := new(controllers.AuthController)
 
+		v1.POST("/login", auth.Login)
 		v1.POST("/token/refresh", auth.Refresh)
 
 		/*** START Article ***/

@@ -287,6 +287,78 @@
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
+/*
+ * ── Authentification (portage de login.html, maquette Atrium) ────────────
+ * Deux volets (.shell), volet marque réservé au bureau, volet formulaire
+ * hébergeant les cartes commutées (.form-card[hidden]). Les jetons viennent
+ * du contrat --od-* de app/src/index.css.
+ */
+
+.shell { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; background: var(--od-bg); color: var(--od-fg); }
+
+.brand-pane { position: relative; background: var(--od-fg); color: #f8fafc; display: flex; flex-direction: column; justify-content: space-between; padding: var(--od-space-12); overflow: hidden; }
+.brand-pane::before { content: ""; position: absolute; inset: 0; background: radial-gradient(900px 500px at 80% -10%, color-mix(in oklab, var(--od-fg), white 12%) 0%, transparent 60%), radial-gradient(600px 400px at -10% 110%, color-mix(in oklab, var(--od-fg), white 8%) 0%, transparent 55%); pointer-events: none; }
+
+.brand-mark { display: flex; align-items: center; gap: var(--od-space-3); font-family: var(--od-font-display); font-weight: 600; font-size: var(--od-text-lg); letter-spacing: -0.01em; position: relative; z-index: 1; }
+.brand-mark .logo-dot { width: 28px; height: 28px; border-radius: var(--od-radius-sm); background: var(--od-bg); display: grid; place-items: center; }
+.brand-mark .logo-dot::after { content: ""; width: 12px; height: 12px; border-radius: 3px; background: var(--od-fg); }
+
+.brand-hero { position: relative; z-index: 1; max-width: 460px; }
+.brand-hero h1 { font-family: var(--od-font-display); font-weight: 600; font-size: var(--od-text-4xl); line-height: var(--od-leading-tight); letter-spacing: var(--od-tracking-display); margin-bottom: var(--od-space-4); }
+.brand-hero p { font-size: var(--od-text-lg); color: #cbd5e1; line-height: 1.55; }
+
+.brand-quote { position: relative; z-index: 1; border-top: 1px solid color-mix(in oklab, var(--od-fg), white 14%); padding-top: var(--od-space-6); display: flex; gap: var(--od-space-4); align-items: flex-start; }
+.brand-quote .avatar { width: 40px; height: 40px; border-radius: var(--od-radius-pill); background: color-mix(in oklab, var(--od-fg), white 16%); flex-shrink: 0; display: grid; place-items: center; font-weight: 600; font-size: var(--od-text-sm); color: #f8fafc; }
+.brand-quote blockquote { font-size: var(--od-text-sm); line-height: 1.55; color: #e2e8f0; }
+.brand-quote cite { display: block; margin-top: var(--od-space-2); font-style: normal; font-size: var(--od-text-xs); color: #94a3b8; }
+
+.form-pane { display: flex; align-items: center; justify-content: center; padding: var(--od-space-8) var(--od-container-gutter-desktop); }
+
+.form-card { width: 100%; max-width: 408px; }
+.form-card[hidden] { display: none; }
+
+.form-head { margin-bottom: var(--od-space-8); }
+.form-head h2 { font-family: var(--od-font-display); font-weight: 600; font-size: var(--od-text-2xl); line-height: var(--od-leading-tight); letter-spacing: var(--od-tracking-display); margin-bottom: var(--od-space-2); }
+.form-head p { color: var(--od-muted); font-size: var(--od-text-sm); }
+
+.mobile-brand { display: none; align-items: center; gap: var(--od-space-3); padding: var(--od-space-6) var(--od-container-gutter-phone); font-family: var(--od-font-display); font-weight: 600; font-size: var(--od-text-base); }
+.mobile-brand .logo-dot { width: 26px; height: 26px; border-radius: var(--od-radius-sm); background: var(--od-fg); display: grid; place-items: center; }
+.mobile-brand .logo-dot::after { content: ""; width: 11px; height: 11px; border-radius: 3px; background: var(--od-bg); }
+
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--od-space-4); margin-bottom: var(--od-space-6); }
+.row-between > a { font-size: var(--od-text-sm); color: var(--od-muted); }
+.row-between > a:hover { color: var(--od-accent); }
+
+.form-foot { margin-top: var(--od-space-8); text-align: center; font-size: var(--od-text-sm); color: var(--od-muted); }
+.form-foot a { color: var(--od-fg); font-weight: 500; }
+.form-foot a:hover { color: var(--od-accent); }
+
+.back-link { display: inline-flex; align-items: center; gap: var(--od-space-2); font-size: var(--od-text-sm); color: var(--od-muted); margin-bottom: var(--od-space-5); transition: color var(--od-motion-fast) var(--od-ease-standard); }
+.back-link svg { width: 16px; height: 16px; }
+.back-link:hover { color: var(--od-accent); }
+.back-link:focus-visible { outline: none; box-shadow: var(--od-focus-ring); border-radius: var(--od-radius-sm); }
+
+.field-help span { font-family: var(--od-font-mono); color: var(--od-fg-2); }
+
+.checkbox.terms { align-items: flex-start; margin-bottom: var(--od-space-6); font-size: var(--od-text-sm); color: var(--od-muted); line-height: 1.5; }
+.checkbox.terms input { margin-top: 2px; flex-shrink: 0; }
+.checkbox.terms a { color: var(--od-fg); font-weight: 500; }
+.checkbox.terms a:hover { color: var(--od-accent); }
+
+.btn-primary[aria-busy="true"] .btn-label { opacity: 0.7; }
+
+@media (max-width: 680px) {
+  .shell { grid-template-columns: 1fr; }
+  .brand-pane { display: none; }
+  .mobile-brand { display: flex; }
+  .form-pane { padding-top: 0; align-items: flex-start; }
+  .form-card { margin-top: var(--od-space-6); }
+}
+
+@media (max-width: 520px) {
+  .brand-pane, .form-pane { padding-left: var(--od-container-gutter-phone); padding-right: var(--od-container-gutter-phone); }
+}
+
 @media (max-width: 1000px) { .stats { grid-template-columns: repeat(2, 1fr); } }
 
 @media (max-width: 560px) {

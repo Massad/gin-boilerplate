@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,6 +17,55 @@ import (
 type AuthController struct{}
 
 var authModel = new(models.AuthModel)
+
+// Login Unified godoc
+// @Summary Unified login example
+// @Schemes
+// @Description Unified login: tenant user first, superadmin fallback
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param auth body forms.LoginForm true "Auth"
+// @Success 	 200  {object}  models.UnifiedLoginResponse
+// @Failure      403  {object}  models.MessageResponse
+// @Failure      406  {object}  models.MessageResponse
+// @Router /login [post]
+func (ctl AuthController) Login(c *gin.Context) {
+	var loginForm forms.LoginForm
+
+	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
+		message := forms.Translate(validationErr, forms.LoginMessages)
+		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
+		return
+	}
+
+	result, err := models.UnifiedLogin(loginForm)
+	if err != nil {
+		if errors.Is(err, models.ErrTenantSuspended) {
+			// A suspended tenant stays observable: the 403 is not masked.
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Tenant suspended"})
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid login details"})
+		return
+	}
+
+	if result.Kind == models.LoginKindSuperadmin {
+		c.JSON(http.StatusOK, gin.H{
+			"kind":  result.Kind,
+			"admin": result.Admin,
+			"token": models.AdminToken{AccessToken: result.AccessToken},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"kind":   result.Kind,
+		"user":   result.User,
+		"tenant": result.Tenant,
+		"token":  result.Token,
+	})
+}
 
 // Refresh Token godoc
 // @Summary Refresh Token example

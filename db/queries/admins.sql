@@ -1,12 +1,12 @@
 -- name: GetAdminByEmail :one
-SELECT id, email, password
+SELECT id, email, password, name
 FROM admin_user
 WHERE email = LOWER(@email) LIMIT 1;
 
 -- name: CreateAdmin :one
-INSERT INTO admin_user (email, password)
-VALUES (LOWER(@email), @password)
-ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password, updated_at = now()
+INSERT INTO admin_user (email, password, name)
+VALUES (LOWER(@email), @password, @name)
+ON CONFLICT (email) DO UPDATE SET password = EXCLUDED.password, name = EXCLUDED.name, updated_at = now()
 RETURNING id;
 
 -- name: InsertAdminAudit :exec

@@ -1,0 +1,170 @@
+// Command e2edb prepares the disposable environment of the end-to-end suite:
+// it recreates the target PostgreSQL database and flushes the Redis database
+// dedicated to the e2e sessions.
+//
+// This binary owns DDL that the application must never run. Creating and
+// dropping a database is an operations task — the same family as the goose
+// migrations and the superadmin bootstrap — and not tenant business SQL: the
+// tenant data only ever lives in the sqlc queries of db/queries/, and this
+// tool issues no business query at all. It only manages the lifecycle of the
+// test environment.
+//
+// The guard rails come first: the tool refuses to touch a database whose name
+// is empty, whose name is the application database (DB_NAME) or whose name
+// does not match the strict allowlist ^[a-z][a-z0-9_]{2,62}$. The identifier
+// is then quoted by pgx.Identifier.Sanitize, so no user-supplied value ever
+// reaches a statement as raw text.
+//
+// Usage:
+//
+//	E2E_DB_NAME=artisan_e2e go run ./cmd/e2edb
+//
+// The connection parameters are read from the environment (DB_HOST, DB_PORT,
+// DB_USER, DB_PASS, SSL, REDIS_HOST, REDIS_PASSWORD): the Makefile target
+// fills them from .env.
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/go-redis/redis/v7"
+	"github.com/jackc/pgx/v5"
+)
+
+const (
+	// targetDBPattern is the strict allowlist of the target database name:
+	// lowercase, no dash, no quote, no space.
+	targetDBPattern = `^[a-z][a-z0-9_]{2,62}$`
+
+	// maintenanceDB is the database every statement runs against: a database
+	// cannot be dropped from inside itself.
+	maintenanceDB = "postgres"
+
+	// redisDBIndex is the Redis database dedicated to the e2e sessions (the
+	// application stores its sessions there).
+	redisDBIndex = 1
+
+	// timeout bounds the whole preparation.
+	timeout = 2 * time.Minute
+)
+
+// targetNamePattern is the compiled allowlist of the target database name.
+var targetNamePattern = regexp.MustCompile(targetDBPattern)
+
+func main() {
+	if err := run(context.Background(), os.Getenv); err != nil {
+		fmt.Fprintf(os.Stderr, "e2edb: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// run prepares the environment: the target database is recreated and the
+// Redis database is flushed.
+func run(ctx context.Context, getenv func(string) string) error {
+	target := strings.TrimSpace(getenv("E2E_DB_NAME"))
+	if err := validateTarget(target, getenv("DB_NAME")); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	if err := recreateDatabase(ctx, getenv, target); err != nil {
+		return err
+	}
+	if err := flushRedis(ctx, getenv); err != nil {
+		return err
+	}
+
+	fmt.Printf("The e2e environment %s is ready\n", target)
+	return nil
+}
+
+// validateTarget enforces the guard rails: an empty name, the application
+// database itself, or a name outside the allowlist is refused before any
+// connection is opened.
+func validateTarget(target, appDB string) error {
+	if target == "" {
+		return errors.New("E2E_DB_NAME is empty: refusing to recreate a database")
+	}
+	if appDB != "" && strings.EqualFold(target, strings.TrimSpace(appDB)) {
+		return fmt.Errorf("E2E_DB_NAME %q is the application database: refusing to drop it", target)
+	}
+	if !targetNamePattern.MatchString(target) {
+		return fmt.Errorf("E2E_DB_NAME %q does not match the allowlist %s", target, targetDBPattern)
+	}
+	return nil
+}
+
+// recreateDatabase drops the target database (forcing the disconnection of
+// the sessions left over by a previous run) and creates it again, empty.
+func recreateDatabase(ctx context.Context, getenv func(string) string, target string) error {
+	conn, err := pgx.Connect(ctx, dsn(getenv, maintenanceDB))
+	if err != nil {
+		return fmt.Errorf("connect to the maintenance database: %w", err)
+	}
+	defer func() { _ = conn.Close(ctx) }()
+
+	// The identifier is quoted by pgx: the name never reaches the statement as
+	// raw text.
+	identifier := pgx.Identifier{target}.Sanitize()
+
+	fmt.Printf("Dropping the database %s\n", target)
+	if _, err := conn.Exec(ctx, "DROP DATABASE IF EXISTS "+identifier+" WITH (FORCE)"); err != nil {
+		return fmt.Errorf("drop the database %s: %w", target, err)
+	}
+
+	fmt.Printf("Creating the database %s\n", target)
+	if _, err := conn.Exec(ctx, "CREATE DATABASE "+identifier); err != nil {
+		return fmt.Errorf("create the database %s: %w", target, err)
+	}
+	return nil
+}
+
+// flushRedis empties the Redis database dedicated to the e2e sessions: the
+// session keys of a previous run must not survive.
+func flushRedis(ctx context.Context, getenv func(string) string) error {
+	host := strings.TrimSpace(getenv("REDIS_HOST"))
+	if host == "" {
+		return errors.New("REDIS_HOST is empty: the e2e Redis database cannot be flushed")
+	}
+	client := redis.NewClient(&redis.Options{
+		Addr:     host,
+		Password: getenv("REDIS_PASSWORD"),
+		DB:       redisDBIndex,
+	}).WithContext(ctx)
+	defer func() { _ = client.Close() }()
+
+	fmt.Printf("Flushing the Redis database %d\n", redisDBIndex)
+	if err := client.FlushDB().Err(); err != nil {
+		return fmt.Errorf("flush the Redis database %d: %w", redisDBIndex, err)
+	}
+	return nil
+}
+
+// dsn builds the libpq keyword/value connection string of the given
+// database. The values are quoted exactly like the application pools do
+// (internal/db).
+func dsn(getenv func(string) string, database string) string {
+	quote := func(value string) string {
+		return "'" + strings.NewReplacer("\\", "\\\\", "'", "\\'").Replace(value) + "'"
+	}
+	sslMode := "disable"
+	if getenv("SSL") == "TRUE" {
+		sslMode = "require"
+	}
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		quote(getenv("DB_HOST")),
+		quote(getenv("DB_PORT")),
+		quote(getenv("DB_USER")),
+		quote(getenv("DB_PASS")),
+		quote(database),
+		sslMode,
+	)
+}

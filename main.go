@@ -53,9 +53,13 @@ import (
 
 // runCreateAdmin bootstraps the platform superadmin through the dedicated admin
 // pool: no HTTP route is ever exposed for this bootstrap.
-func runCreateAdmin(ctx context.Context, getenv func(string) string, email, password string) error {
+func runCreateAdmin(ctx context.Context, getenv func(string) string, email, password, name string) error {
 	if strings.TrimSpace(email) == "" || strings.TrimSpace(password) == "" {
 		return errors.New("error: -email and -password are required")
+	}
+	displayName := strings.TrimSpace(name)
+	if displayName == "" {
+		displayName = "Superadmin"
 	}
 	if err := pgdb.InitAdmin(ctx, getenv); err != nil {
 		return err
@@ -64,7 +68,7 @@ func runCreateAdmin(ctx context.Context, getenv func(string) string, email, pass
 	if err != nil {
 		return err
 	}
-	if _, err := (models.AdminModel{}).Create(email, string(hashed)); err != nil {
+	if _, err := (models.AdminModel{}).Create(email, string(hashed), displayName); err != nil {
 		return err
 	}
 	fmt.Printf("Superadmin %s created\n", strings.ToLower(strings.TrimSpace(email)))
@@ -98,14 +102,15 @@ func main() {
 	// The superadmin bootstrap is a CLI flag, parsed before any HTTP runtime:
 	// the process exits right after the creation.
 	var createAdmin bool
-	var adminEmail, adminPassword string
+	var adminEmail, adminPassword, adminName string
 	flag.BoolVar(&createAdmin, "create-admin", false, "create or reset the platform superadmin and exit")
 	flag.StringVar(&adminEmail, "email", "", "superadmin email")
 	flag.StringVar(&adminPassword, "password", "", "superadmin password")
+	flag.StringVar(&adminName, "name", "Superadmin", "superadmin display name")
 	flag.Parse()
 
 	if createAdmin {
-		if err := runCreateAdmin(context.Background(), os.Getenv, adminEmail, adminPassword); err != nil {
+		if err := runCreateAdmin(context.Background(), os.Getenv, adminEmail, adminPassword, adminName); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -150,6 +155,7 @@ func main() {
 		/*** START AUTH ***/
 		auth := new(controllers.AuthController)
 
+		v1.POST("/login", auth.Login)
 		v1.POST("/token/refresh", auth.Refresh)
 
 		/*** START Article ***/

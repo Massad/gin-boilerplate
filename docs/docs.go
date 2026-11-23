@@ -322,6 +322,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/login": {
+            "post": {
+                "description": "Unified login: tenant user first, superadmin fallback",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Unified login example",
+                "parameters": [
+                    {
+                        "description": "Auth",
+                        "name": "auth",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/forms.LoginForm"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UnifiedLoginResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.MessageResponse"
+                        }
+                    },
+                    "406": {
+                        "description": "Not Acceptable",
+                        "schema": {
+                            "$ref": "#/definitions/models.MessageResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/token/refresh": {
             "post": {
                 "description": "Refresh Token example",
@@ -575,6 +621,20 @@ const docTemplate = `{
                 }
             }
         },
+        "models.AdminIdentity": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "models.AllArticleResponse": {
             "type": "object",
             "properties": {
@@ -630,6 +690,17 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "models.LoginKind": {
+            "type": "string",
+            "enum": [
+                "tenant_user",
+                "superadmin"
+            ],
+            "x-enum-varnames": [
+                "LoginKindTenantUser",
+                "LoginKindSuperadmin"
+            ]
         },
         "models.MessageResponse": {
             "type": "object",
@@ -708,6 +779,26 @@ const docTemplate = `{
                 },
                 "refresh_token": {
                     "type": "string"
+                }
+            }
+        },
+        "models.UnifiedLoginResponse": {
+            "type": "object",
+            "properties": {
+                "admin": {
+                    "$ref": "#/definitions/models.AdminIdentity"
+                },
+                "kind": {
+                    "$ref": "#/definitions/models.LoginKind"
+                },
+                "tenant": {
+                    "$ref": "#/definitions/models.TenantPayload"
+                },
+                "token": {
+                    "$ref": "#/definitions/models.Token"
+                },
+                "user": {
+                    "$ref": "#/definitions/models.User"
                 }
             }
         },

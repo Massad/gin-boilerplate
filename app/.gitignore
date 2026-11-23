@@ -5,3 +5,8 @@ node_modules
 
 *storybook.log
 storybook-static
+
+# playwright artifacts #
+######################
+playwright-report
+test-results

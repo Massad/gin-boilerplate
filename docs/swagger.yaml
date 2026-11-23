@@ -72,6 +72,15 @@ definitions:
     required:
     - refresh_token
     type: object
+  models.AdminIdentity:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   models.AllArticleResponse:
     properties:
       results:
@@ -108,6 +117,14 @@ definitions:
       refresh_token:
         type: string
     type: object
+  models.LoginKind:
+    enum:
+    - tenant_user
+    - superadmin
+    type: string
+    x-enum-varnames:
+    - LoginKindTenantUser
+    - LoginKindSuperadmin
   models.MessageResponse:
     properties:
       message:
@@ -158,6 +175,19 @@ definitions:
         type: string
       refresh_token:
         type: string
+    type: object
+  models.UnifiedLoginResponse:
+    properties:
+      admin:
+        $ref: '#/definitions/models.AdminIdentity'
+      kind:
+        $ref: '#/definitions/models.LoginKind'
+      tenant:
+        $ref: '#/definitions/models.TenantPayload'
+      token:
+        $ref: '#/definitions/models.Token'
+      user:
+        $ref: '#/definitions/models.User'
     type: object
   models.User:
     properties:
@@ -405,6 +435,36 @@ paths:
       summary: Get All Articles example
       tags:
       - Article
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: 'Unified login: tenant user first, superadmin fallback'
+      parameters:
+      - description: Auth
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/forms.LoginForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UnifiedLoginResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+        "406":
+          description: Not Acceptable
+          schema:
+            $ref: '#/definitions/models.MessageResponse'
+      summary: Unified login example
+      tags:
+      - Auth
   /token/refresh:
     post:
       consumes:

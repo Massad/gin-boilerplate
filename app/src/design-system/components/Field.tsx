@@ -6,7 +6,8 @@ import { AlertCircleIcon, ChevronDownIcon, EyeIcon, EyeOffIcon, LockIcon } from 
 export interface FieldProps {
   label: string
   htmlFor: string
-  help?: string
+  /** Help line under the control; may embed styled spans (e.g. slug preview). */
+  help?: ReactNode
   error?: string
   children: ReactNode
 }
