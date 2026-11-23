@@ -7,9 +7,9 @@
 import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
 
-const ADMIN_EMAIL = "e2e-admin@atrium.dev"
+const ADMIN_EMAIL = "admin@e2e.local"
 const ADMIN_PASSWORD = "e2e-admin-password-0"
-const OWNER_EMAIL = "e2e-owner@atrium.dev"
+const OWNER_EMAIL = "owner@e2e.local"
 const OWNER_PASSWORD = "e2e-owner-password-0"
 
 /** The message of a rejected login, as the maquette spells it. */
@@ -43,6 +43,7 @@ test.describe("Connexion unifiée", () => {
     await page.goto("/login")
     await submitLogin(page, ADMIN_EMAIL, ADMIN_PASSWORD, false)
 
+    await expect(page).toHaveURL(/\/admin$/)
     await expect(page.getByRole("heading", { name: "Admin", level: 1 })).toBeVisible()
     await expect(page.getByText("Bienvenue Prénom Nom")).toBeVisible()
 
@@ -57,6 +58,7 @@ test.describe("Connexion unifiée", () => {
     await page.goto("/login")
     await submitLogin(page, OWNER_EMAIL, OWNER_PASSWORD, true)
 
+    await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole("heading", { name: "Tenant", level: 1 })).toBeVisible()
     await expect(page.getByText("Bienvenue Camille Laurent")).toBeVisible()
 
@@ -67,15 +69,18 @@ test.describe("Connexion unifiée", () => {
     expect(await readStoredSession(page, "sessionStorage")).toBeNull()
 
     await page.reload()
+    await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole("heading", { name: "Tenant", level: 1 })).toBeVisible()
     await expect(page.getByText("Bienvenue Camille Laurent")).toBeVisible()
   })
 
   test("CUJ3 — un mot de passe erroné est refusé sans session", async ({ page }) => {
     await page.goto("/login")
-    await submitLogin(page, "ghost@atrium.dev", "wrong-password", false)
+    await submitLogin(page, OWNER_EMAIL, "wrong-password", false)
 
     await expect(page.getByRole("alert")).toHaveText(LOGIN_ERROR_TEXT)
+    // The rejected attempt stays on the login view.
+    await expect(page).toHaveURL(/\/login$/)
     expect(await readStoredSession(page, "sessionStorage")).toBeNull()
     expect(await readStoredSession(page, "localStorage")).toBeNull()
   })

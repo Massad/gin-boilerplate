@@ -22,5 +22,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", ".storybook", "vite.config.ts"]
+  "include": ["src", ".storybook", "e2e", "vite.config.ts", "playwright.config.ts"]
 }

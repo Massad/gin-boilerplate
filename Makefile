@@ -119,13 +119,13 @@ PNPM ?= corepack pnpm
 e2e:
 	@echo -e "🧪 Preparing the e2e database ($(E2E_DB_NAME))..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	DB_USER=postgres DB_PASS=postgres E2E_DB_NAME=$(E2E_DB_NAME) go run -mod=readonly ./cmd/e2edb
+	E2E_DB_ADMIN_USER=postgres E2E_DB_ADMIN_PASS=postgres E2E_DB_NAME=$(E2E_DB_NAME) go run -mod=readonly ./cmd/e2edb
 	@echo -e "🗄️  Applying the migrations on $(E2E_DB_NAME)..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
 	"$(MAKE)" --no-print-directory SHELL="$(SHELL)" migrate_up DB_NAME=$(E2E_DB_NAME) DB_USER=postgres DB_PASS=postgres DB_HOST="$$DB_HOST" DB_PORT="$$DB_PORT" SSL="$$SSL"
 	@echo -e "👤 Seeding the e2e superadmin..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	DB_NAME=$(E2E_DB_NAME) go run -mod=readonly . -create-admin -email e2e-admin@atrium.dev -password e2e-admin-password-0 -name "Prénom Nom"
+	DB_NAME=$(E2E_DB_NAME) go run -mod=readonly . -create-admin -email admin@e2e.local -password e2e-admin-password-0 -name "Prénom Nom"
 	@echo -e "🏗️  Building the frontend..."
 	@cd app && $(PNPM) build
 	@echo -e "🎭 Running the Playwright suite..."

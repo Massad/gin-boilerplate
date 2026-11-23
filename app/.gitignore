@@ -10,3 +10,7 @@ storybook-static
 ######################
 playwright-report
 test-results
+
+# vite build output (artifact deployed with the binary, never tracked) #
+######################
+dist

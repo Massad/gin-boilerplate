@@ -56,7 +56,7 @@ func TestUnifiedLoginTenantUser(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.Code)
 
 	var res struct {
-		Kind   string `json:"kind"`
+		Kind   string               `json:"kind"`
 		User   models.User          `json:"user"`
 		Tenant models.TenantPayload `json:"tenant"`
 		Token  models.Token         `json:"token"`
@@ -105,7 +105,7 @@ func TestUnifiedLoginSuperadmin(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.Code)
 
 	var res struct {
-		Kind string `json:"kind"`
+		Kind  string `json:"kind"`
 		Admin struct {
 			ID    string `json:"id"`
 			Email string `json:"email"`

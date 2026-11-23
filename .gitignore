@@ -16,4 +16,6 @@ cert/
 # BUILD #
 /gin-boilerplate
 /gin-boilerplate.exe
+/e2edb
+/e2edb.exe
 .cache/tools/
