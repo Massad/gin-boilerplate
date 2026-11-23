@@ -324,7 +324,7 @@ const docTemplate = `{
         },
         "/login": {
             "post": {
-                "description": "Unified login: tenant user first, superadmin fallback",
+                "description": "Unified login: tenant user first, superadmin fallback\nThe response is discriminated by kind: kind=tenant_user carries user, tenant and an access/refresh token pair; kind=superadmin carries admin and an access token only (no refresh_token).",
                 "consumes": [
                     "application/json"
                 ],

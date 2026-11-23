@@ -51,9 +51,10 @@ type UnifiedLoginResult struct {
 }
 
 // UnifiedLoginResponse is the documented payload of POST /v1/login. The
-// handler answers per branch: the tenant-user branch populates user/tenant and
-// an access/refresh token pair, the superadmin branch populates admin and a
-// single long-lived access token (8h, no refresh).
+// response is a union discriminated by kind: the tenant-user branch populates
+// user/tenant and an access/refresh token pair, the superadmin branch
+// populates admin and a single long-lived access token (8h, no refresh — the
+// refresh_token key is then absent from the payload).
 type UnifiedLoginResponse struct {
 	Kind   LoginKind     `json:"kind"`
 	User   User          `json:"user,omitempty"`

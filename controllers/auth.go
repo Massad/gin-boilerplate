@@ -22,6 +22,7 @@ var authModel = new(models.AuthModel)
 // @Summary Unified login example
 // @Schemes
 // @Description Unified login: tenant user first, superadmin fallback
+// @Description The response is discriminated by kind: kind=tenant_user carries user, tenant and an access/refresh token pair; kind=superadmin carries admin and an access token only (no refresh_token).
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -51,10 +52,12 @@ func (ctl AuthController) Login(c *gin.Context) {
 	}
 
 	if result.Kind == models.LoginKindSuperadmin {
+		// The superadmin session has no refresh half: the token model omits
+		// the empty refresh_token key.
 		c.JSON(http.StatusOK, gin.H{
 			"kind":  result.Kind,
 			"admin": result.Admin,
-			"token": models.AdminToken{AccessToken: result.AccessToken},
+			"token": models.Token{AccessToken: result.AccessToken},
 		})
 		return
 	}

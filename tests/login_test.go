@@ -5,7 +5,9 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -76,6 +78,11 @@ func TestUnifiedLoginTenantUser(t *testing.T) {
 	require.NotEmpty(t, res.Token.RefreshToken)
 	unifiedTenantID = res.Tenant.ID
 
+	// The tenant branch advertises both halves of the session.
+	token := tokenPayload(t, resp)
+	require.Contains(t, token, "access_token")
+	require.Contains(t, token, "refresh_token")
+
 	// The access half of the session must live in Redis.
 	accessUUID := accessUUIDFromToken(t, res.Token.AccessToken, "ACCESS_SECRET")
 	require.Equal(t, int64(1), db.GetRedis().Exists(accessUUID).Val(), "the access token session must exist in Redis")
@@ -122,6 +129,12 @@ func TestUnifiedLoginSuperadmin(t *testing.T) {
 	require.Equal(t, email, res.Admin.Email)
 	require.Equal(t, "Laure Moreau", res.Admin.Name)
 	require.NotEmpty(t, res.Token.AccessToken)
+
+	// The superadmin branch carries no refresh half: the key is absent from
+	// the payload, not serialized empty.
+	token := tokenPayload(t, resp)
+	require.Contains(t, token, "access_token")
+	require.NotContains(t, token, "refresh_token", "the superadmin branch must not advertise a refresh token")
 
 	// The superadmin session half lives under the admin: prefix in Redis.
 	adminUUID := accessUUIDFromToken(t, res.Token.AccessToken, "ADMIN_ACCESS_SECRET")
@@ -223,9 +236,17 @@ func TestUnifiedLoginLegacyEndpoints(t *testing.T) {
 
 	resp := doRequest(testRouter, "POST", "/v1/user/login", forms.LoginForm{Email: unifiedEmail, Password: unifiedPassword}, "")
 	require.Equal(t, http.StatusOK, resp.Code)
+	// The legacy tenant endpoint keeps its access/refresh pair.
+	userToken := tokenPayload(t, resp)
+	require.Contains(t, userToken, "access_token")
+	require.Contains(t, userToken, "refresh_token")
 
 	resp = doRequest(testRouter, "POST", "/v1/admin/login", forms.LoginForm{Email: unifiedAdminEmail, Password: unifiedAdminPassword}, "")
 	require.Equal(t, http.StatusOK, resp.Code)
+	// The legacy admin endpoint keeps its access-token-only payload.
+	adminToken := tokenPayload(t, resp)
+	require.Contains(t, adminToken, "access_token")
+	require.NotContains(t, adminToken, "refresh_token")
 }
 
 /**
@@ -256,6 +277,17 @@ func TestUnifiedLoginCleanUp(t *testing.T) {
 	if keys, err := db.GetRedis().Keys("admin:*").Result(); err == nil && len(keys) > 0 {
 		db.GetRedis().Del(keys...)
 	}
+}
+
+// tokenPayload returns the raw JSON keys of the "token" object of a login
+// response, so a test can assert the presence or the absence of a key.
+func tokenPayload(t *testing.T, resp *httptest.ResponseRecorder) map[string]json.RawMessage {
+	t.Helper()
+	var body struct {
+		Token map[string]json.RawMessage `json:"token"`
+	}
+	decode(t, resp, &body)
+	return body.Token
 }
 
 // accessUUIDFromToken parses an access token with the given secret env key and

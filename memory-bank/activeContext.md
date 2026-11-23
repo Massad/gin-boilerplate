@@ -2,9 +2,9 @@
 
 > File de contexte courant — mettre à jour à CHAQUE session (pattern memory bank).
 
-## Session 2026-11-23 — plan « vue de connexion simple » (`.kilo/plans/1795428465642-login-simple.md`) : backend + frontend + e2e verts, vérification finale en cours
+## Session 2026-11-23 — plan « vue de connexion simple » (`.kilo/plans/1795428465642-login-simple.md`) : backend + frontend + e2e verts, vérification finale close (passe de correction du drift incluse)
 
-Implémentation complète : items 1-30 faits et vérifiés, item 31 = ce fichier. Arbre de travail **non commité** (aucun commit demandé pour l'instant).
+Implémentation complète : items 1-30 faits et vérifiés, item 31 = ce fichier. Arbre de travail **partiellement commité** (`3ac3aae` détrack `app/dist`, `57992de` job CI frontend + harnais e2e + memory bank + plan + drift report) ; les **corrections de drift** restent en working tree **non commité** (aucun commit demandé pour cette passe).
 
 ### Backend — VERT (sessions précédentes)
 
@@ -17,7 +17,7 @@ Implémentation complète : items 1-30 faits et vérifiés, item 31 = ce fichier
 
 - `app/src/auth/session.ts` : clé unique `atrium.session`, écriture localStorage (« Rester connecté ») ou sessionStorage, lecture avec repli, purge.
 - `app/src/lib/api.ts` : wrapper `/v1` ; interception 401 centralisée — tenant : **une seule** promesse de refresh partagée + **un seul** rejeu de la requête ; échec du refresh → purge + `/login` ; admin (401, pas de refresh) → purge + `/login`.
-- `app/src/auth/AuthContext.tsx` (session au boot, login/logout, navigation par `kind`), `app/src/router.tsx` (gardes `beforeLoad` : session absente → `/login`, kind incompatible → page correspondante), `app/src/pages/LoginPage.tsx` (4 vues `login | create | request | forgot`, SSO masqué, vues secondaires inertes avec bannière « à venir », aperçu de slug), `AdminHomePage` / `TenantHomePage` (« Admin » / « Tenant » + « Bienvenue {name} »), `App.tsx` (QueryClientProvider + AuthProvider + RouterProvider), `AuthLayout` + story, styles `.shell/.brand-*` dans `atrium.css`, config vitest (jsdom + `@testing-library/jest-dom`).
+- `app/src/auth/AuthContext.tsx` (session au boot, login/logout, navigation par `kind`), `app/src/router.tsx` (gardes `beforeLoad` : session absente → `/login`, kind incompatible → page correspondante), `app/src/pages/LoginPage.tsx` (4 vues `login | create | request | forgot`, SSO masqué, vues secondaires inertes avec bannière « à venir », aperçu de slug), `AdminHomePage` / `TenantHomePage` (« Admin » / « Tenant » + « Bienvenue {name} »), `App.tsx` (composition du design : `QueryClientProvider` → `RouterContextProvider` → `AuthProvider` → `RouterProvider`), `AuthLayout` + story, styles `.shell/.brand-*` dans `atrium.css`, config vitest (jsdom + `@testing-library/jest-dom`).
 - 22 tests React verts (`session.test.ts`, `api.test.ts`, `LoginPage.test.tsx`) ; `pnpm lint`, `pnpm build`, `pnpm test`, `pnpm build-storybook` verts.
 - Cause-racine des échecs initiaux (documentée) : le premier rendu d'un `RouterProvider` est **asynchrone** → `waitFor` obligatoire dans les asserts ; `createRouter({ routeTree: undefined })` ne panic pas (routeur sans routes rendu vide).
 
@@ -37,14 +37,20 @@ Implémentation complète : items 1-30 faits et vérifiés, item 31 = ce fichier
 - `.github/workflows/ci.yml` : job `frontend` — étape `pnpm test` insérée **entre** `pnpm build` et le smoke test `pnpm build-storybook` (YAML validé).
 - `AGENTS.md` : `POST /v1/login` (réponses discriminées, bcrypt factice, politique non-recouvrement), migration 000003, flag `-name`, `make e2e` (prérequis `playwright install`), tests React (`app/src/**`, e2e exclu de l'include vitest), bump `SQLC_VERSION` v1.30.0 (flaky : relancer la cible en cas de panic), `cmd/e2edb`.
 
-## Reste à faire (en cours — vérification finale du plan)
+### Passe drift 2026-11-23 (3 divergences du drift report corrigées)
 
-- `make test` complet (PostgreSQL + Redis actifs) ; `make generate_sqlc` → diff **vide** sur `internal/db` (garde CI `git diff --exit-code internal/db`) ; `make generate_docs` (Swagger à jour après les annotations).
-- Points en suspens :
-  - (a) `app/dist/` est **suivi par git** et chaque `pnpm build` le réécrit en **LF** alors que la version committée est en **CRLF** → diff fantôme sur `app/dist/index.html` (restauré via `git checkout` à chaque fois) ; à trancher : normaliser LF dans l'arbre ou ignorer `app/dist`.
-  - (b) dérive `gofmt` **préexistante** sur `tests/login_test.go` (2 lignes d'alignement de tags de struct, introduites par le commit `7a68626`) → à replier au passage.
-  - (c) la CI réelle n'est pas exécutable localement (aucun push demandé) : seuls les jobs sont validés statiquement.
-- Aucun commit demandé : tout le travail du plan reste en **working tree non commité**.
+- **Item 18 — composition `App.tsx`** : le fichier suit désormais la composition du design — `QueryClientProvider` → `RouterContextProvider` (`@tanstack/react-router`) → `AuthProvider` → `RouterProvider` ; l'intermédiaire technique est requis car `AuthContext` appelle `useNavigate()` **au-dessus** du `RouterProvider` ; la route racine de `app/src/router.tsx` ne porte plus que l'`Outlet`. Non-régression verte : `pnpm test` 22/22, `pnpm lint`, `pnpm build`.
+- **Items 6/10 — branche superadmin sans refresh** : `models/auth.go` — `Token.RefreshToken` taggé `json:"refresh_token,omitempty"` (la clé disparaît du payload quand elle est vide) ; `controllers/auth.go` — la branche superadmin renvoie `models.Token{AccessToken}` (filaire inchangé) + annotations décrivant l'union discriminée par `kind` ; `tests/login_test.go` — helper `tokenPayload` + asserts (superadmin → `refresh_token` **absent**, tenant → les deux, endpoints legacy verrouillés) ; `docs/` régénérés (`make generate_docs`, idempotent) — le schéma `models.Token` généré conserve la propriété `refresh_token` (swag n'honore pas `omitempty`), l'absence côté superadmin est documentée dans la description d'endpoint.
+- **Item 31 — memory bank resynchronisée** : `activeContext.md` (bloc de vérification finale passé en « clos », composition `App.tsx` corrigée) + `progress.md` (point de vérification `[x]`, entrée d'historique 21, « limites connues » à jour) + ligne de statut du plan (`.kilo/plans/1795428465642-login-simple.md`, section « Implementation Status »).
+
+## Vérification finale du plan — CLOS (fait et vérifié le 2026-11-23)
+
+- `gofmt -l .` → **vide** (dérive `tests/login_test.go` repliée) ; `git diff --exit-code internal/db` → **vide dès la 1re passe** (sqlc v1.30.0, garde CI satisfaite) ; `make generate_docs` → **idempotent** (doc régénérée à l'identique) ; `go vet -mod=readonly ./...` → vert.
+- `make test` → **VERT** (exit 0, 66 PASS / 0 FAIL / 0 SKIP, 10 packages `ok`, PostgreSQL + Redis actifs) ; frontend : `pnpm lint` exit 0, `pnpm test` 22/22, `pnpm build` exit 0.
+- Décision `app/dist` **actée** : 10 fichiers retirés de l'index (commit `3ac3aae`) + `dist` dans `app/.gitignore` → plus de diff fantôme CRLF/LF, et le smoke test CI Go retrouve le fallback démo (« Gin Boilerplate ») → **redevient vert** ; les fichiers restent sur disque (dev, `make e2e`).
+- Point à solder au prochain commit : `e2edb.exe` est **encore suivi** (un fichier déjà suivi n'est pas ignoré par `.gitignore`) → `git rm --cached e2edb.exe`.
+- Limite assumée : la CI réelle reste **non exécutable localement** (aucun push demandé) — jobs validés statiquement seulement.
+- Les **corrections de drift** (`app/src/App.tsx`, `app/src/router.tsx`, `models/auth.go`, `models/login.go`, `controllers/auth.go`, `tests/login_test.go`, `docs/`) restent en **working tree non commité**.
 
 ## Leçons durables (poste Windows + WSL)
 
@@ -61,4 +67,4 @@ Implémentation complète : items 1-30 faits et vérifiés, item 31 = ce fichier
 - 2026-11-22 : Storybook 10.6.8 + harness tokens dans `app/` ; correction de l'environnement de test Windows (`.env` déquoté, `REDIS_PASSWORD` vidé, poppler winget, cible `test` qui masque le xpdf de Git for Windows).
 - 2026-11-23 (matin) : stack de test Go (mockery, gofakeit, testfixtures, testcontainers, goose v3.20.0) + helpers `internal/testutil/`.
 - 2026-11-23 (après-midi) : plan login simple — phase backend (items 1-10) puis phase frontend (items 11-23).
-- 2026-11-23 (soir) : phase e2e exécutée et verte, CI + AGENTS.md + memory bank (items 29-31) ; reste la vérification finale puis le commit, non demandé.
+- 2026-11-23 (soir) : phase e2e exécutée et verte, CI + AGENTS.md + memory bank (items 29-31) ; puis passe de correction du drift (3 divergences) et vérification finale close (gofmt, sqlc, docs, `make test` verts ; `app/dist` détracké et commité).

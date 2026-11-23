@@ -3,10 +3,11 @@
  * route needs an authenticated session of its expected kind, a missing session
  * falls back to /login, and a session of the other kind is sent to its own
  * home (an admin on the tenant home is redirected to /admin and vice versa).
+ * The AuthProvider is mounted in App.tsx, above the RouterProvider: the root
+ * route only renders the outlet.
  */
 
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router"
-import { AuthProvider } from "@/auth/AuthContext"
 import { readSession } from "@/auth/session"
 import AdminHomePage from "@/pages/AdminHomePage"
 import LoginPage from "@/pages/LoginPage"
@@ -14,11 +15,7 @@ import TenantHomePage from "@/pages/TenantHomePage"
 
 const rootRoute = createRootRoute({
   component: () => {
-    return (
-      <AuthProvider>
-        <Outlet />
-      </AuthProvider>
-    )
+    return <Outlet />
   },
 })
 
