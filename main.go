@@ -141,7 +141,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer pgdb.Close()
-	db.InitRedis(1)
+	if err := db.InitRedis(); err != nil {
+		log.Fatal(err)
+	}
 
 	v1 := r.Group("/v1")
 	{

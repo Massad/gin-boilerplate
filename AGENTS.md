@@ -6,7 +6,7 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 
 - `make run` — lance l'app (`go run .`) ; le Makefile lit le même `.env` que l'app (`-include .env`) ; démarre d'abord la stack dev (prérequis `services_up`)
 - `make test` — suite complète : `go test -mod=readonly -count=1 -v -tags=all ./...` (prérequis `services_up` ; nécessite PostgreSQL + Redis actifs ; la cible source `.env` elle-même avant d'exécuter les outils, et masque sous Windows le `pdftotext` xpdf embarqué de Git for Windows : un poppler réel dans le PATH — `winget install --id oschwartz10612.Poppler` — est requis pour les tests PDF)
-- `make e2e` — cycle e2e Playwright (prérequis `services_up`) : recrée la base jetable `artisan_e2e` (`go run ./cmd/e2edb`, drop/create en superuser épinglé `E2E_DB_ADMIN_USER/PASS`, `FLUSHDB` Redis db 1), migrations goose, fixture superadmin via le CLI (`-name "Prénom Nom"`) + owner tenant seedé par le projet `setup` Playwright (`POST /v1/user/register`), `pnpm build`, puis `pnpm exec playwright test` (webServer `go run .`, `DB_NAME=artisan_e2e`, port 9100, origine unique `app/dist`) ; prérequis PostgreSQL + Redis actifs, `.env`, et UNE fois `pnpm -C app exec playwright install chromium` — effet de bord attendu : le `FLUSHDB` purge la base Redis 1 (sessions de l'app de dev)
+- `make e2e` — cycle e2e Playwright (prérequis `services_up`) : recrée la base jetable `artisan_e2e` (`go run ./cmd/e2edb`, drop/create en superuser épinglé `E2E_DB_ADMIN_USER/PASS`, `FLUSHDB` de l'index `REDIS_DB` (3 dans le cycle e2e) ; les sessions dev (index 1) ne sont plus purgées), migrations goose, fixture superadmin via le CLI (`-name "Prénom Nom"`) + owner tenant seedé par le projet `setup` Playwright (`POST /v1/user/register`), `pnpm build`, puis `pnpm exec playwright test` (webServer `go run .`, `DB_NAME=artisan_e2e`, `REDIS_DB=3`, port 9100, origine unique `app/dist`) ; prérequis PostgreSQL + Redis actifs, `.env`, et UNE fois `pnpm -C app exec playwright install chromium` — effet de bord attendu : le `FLUSHDB` purge l'index `REDIS_DB` (3 dans le cycle e2e), les sessions dev (index 1) subsistent
 - `make services_up` / `make services_down` / `make postgres_up` / `make redis_up` / `make check_ports` — stack dev Docker (`docker-compose.yml` à la racine, projet `name: artisan-dev`, images `postgres:18-alpine` / `redis:8-alpine`, ports loopback `127.0.0.1:15432` / `127.0.0.1:16379`, volumes nommés, `--wait` sur les healthchecks) ; le prérequis `services_up` porte sur `run`/`test`/`e2e` uniquement — **jamais sur les migrations** (la CI les invoque aussi) ; `check_ports` échoue si compose et `.env` divergent sur les ports ; contrat du schéma : `services_up` démarre le cluster, `make migrate_up` (superuser) crée le schéma — démarrer les conteneurs ne dispense pas de la première migration ; reset destructeur : `docker compose down -v` (efface données et sessions Redis, re-login requis)
 - `make migrate_up` / `make migrate_down` — migrations goose (`db/migrations/`, épinglé dans le Makefile). JAMAIS de `psql < db/*.sql` direct. Le superuser n'est requis que pour migrer (la migration 000002 crée les rôles `app_user`/`app_admin`) ; l'app et les tests se connectent en rôles non-superuser
 - `make generate_sqlc` — régénère `internal/db/` ; à rejouer après TOUTE modification de `db/queries/` ou `db/migrations/`, code généré commité (la CI le vérifie par `git diff --exit-code internal/db`) ; sqlc épinglé v1.30.0 (v1.27.0 crashait au démarrage : runtime wasm wazero incompatible avec la toolchain Go locale) — outil encore flaky, relancer la cible en cas de panic
@@ -25,12 +25,12 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 - `forms/` — structs de validation (tags `binding:`) + maps `XxxMessages`
 - `middleware/` — CORS, RequestID, `TokenAuth()` (JWT tenant), `AdminAuth()` (JWT admin, secret séparé), `RequirePermission` (RBAC minimal owner/member)
 - `internal/db/` — code GÉNÉRÉ sqlc (ne pas éditer à la main) + `pool.go` écrit à la main : deux pools pgx (tenant `app_user` / admin `app_admin BYPASSRLS`), `WithTenant`, `postgresDSN`
-- `db/` — init Redis (`InitRedis`/`GetRedis`)
+- `db/` — init Redis (`RedisDBIndex`, `InitRedis() error` (l'index vient de `REDIS_DB`)/`GetRedis`)
 - `db/migrations/` — migrations goose versionnées (000001 baseline uuid/timestamptz, 000002 multi-tenant : rôles, tables tenant/admin, RLS, grants, 000003 `admin_user.name` varchar NOT NULL DEFAULT 'Superadmin' — table plateforme sans RLS, back-compat)
 - `db/queries/` — sources SQL de sqlc (articles, users, tenants, admins) : TOUTE requête SQL vit ici
 - `db/` racine : Redis seulement
 - `config/` — validation des 3 secrets de signature (`ValidateSigningSecrets`)
-- `cmd/e2edb/` — outil CLI d'infra e2e (drop/create de la base cible en superuser + purge de la base Redis 1) ; garde-fous anti-DROP (nom vide / `DB_NAME` / `postgres` / `template*` refusés, identifiant quoté par pgx) + test unitaire pur
+- `cmd/e2edb/` — outil CLI d'infra e2e (drop/create de la base cible en superuser + purge de l'index `REDIS_DB` (3 dans le cycle e2e ; refuse l'index dev 1 quand `REDIS_DB` est absent)) ; garde-fous anti-DROP (nom vide / `DB_NAME` / `postgres` / `template*` refusés, identifiant quoté par pgx) + test unitaire pur
 - `invoice/` — bibliothèque de génération de factures HTML/PDF, sans route HTTP
 - `app/` — frontend Vite + React 19 + Tailwind 4 (TypeScript strict, pnpm) ; `app/.storybook/` — config Storybook (`@storybook/react-vite` 10, addons docs/a11y/themes, preview branché sur `app/src/index.css`) ; `app/src/design-system/` — palettes de tokens lues à l'exécution depuis les variables CSS de `app/src/index.css` (contrat jetons, pont « Open Design » futur) ; stories CSF colocalisées (`app/src/**/*.stories.tsx` + pages MDX) ; `app/e2e/` — specs Playwright (projet `setup` de seed + `chromium` des scénarios) ; `app/eslint.config.js` — lint flat couvrant `.storybook/` et les stories
 - `docs/` — Swagger auto-généré (ne pas éditer à la main), `public/` — templates/statiques, `tests/` — tests d'intégration (tag `all`)
@@ -47,6 +47,8 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 - Réponses JSON via `gin.H{"message": ...}` ; sessions JWT (Redis) gérées dans `models/auth.go` avec rotation atomique et index `user_sessions:*` ; tokens admin préfixés `admin:`, signés avec `ADMIN_ACCESS_SECRET`
 - 401 = non authentifié ; 403 = rôle insuffisant (`RequirePermission`) ou tenant suspendu
 - Commentaires godoc sur les types/fonctions exportés ; pas de commentaires superflus dans le code
+- Docs de librairies : pour chercher une information sur une librairie/framework, préférer l'appel au MCP `context7` (docs à jour) plutôt que d'explorer le code des packages — l'exploration de sources consomme beaucoup de tokens
+- Décisions : quand les fonctions du skill `clef-decisions` peuvent rendre service à l'agent actif (choix d'action, routage/classification, jugement oui/non, scoring, questions groupées), le privilégier — ses compétences + son MCP `clef_decide` font économiser des tokens (probabilités calibrées en une passe, sans exploration ni long raisonnement)
 
 ## Tests
 
@@ -56,7 +58,7 @@ Trois niveaux :
 
 - **Unitaires** (sans services, sans tag) : `config/secrets_test.go` (3 secrets ≥ 32 octets distincts), `models/tenant_test.go` (slugify/réservés, fonctions pures), `invoice/invoice_test.go` (requiert `pdftotext` / poppler), `cmd/e2edb/main_test.go` (garde anti-DROP du tool e2e) — exécutables via `go test -mod=readonly -count=1 -race ./<pkg>`
 - **Intégration** (derrière le tag `all`) : `tests/article_test.go` (suite HTTP complète via `httptest` + `SetupRouter`, séquentielle : `TestIntDB` initialise, `TestCleanUp` nettoie, état partagé via variables de package ; isolation croisée, RLS fail-closed en SQL brut, rôles admin), `controllers/auth_test.go`, `middleware/auth_test.go`, `internal/db/pool_test.go` (parse DSN pgx, mots de passe espacés/quotés) — nécessitent PostgreSQL + Redis actifs (lancés via `make test`, qui source `.env` automatiquement)
-- **E2E** (Playwright, hors tags Go) : `make e2e` — specs `app/e2e/*` (projet `setup` : seed de l'owner tenant ; `chromium` : scénarios) contre le binaire Go servant `app/dist` (origine unique, port 9100) ; base `artisan_e2e` jetable recréée à chaque cycle, `FLUSHDB` purge la base Redis 1 (sessions de l'app de dev) — effet de bord attendu
+- **E2E** (Playwright, hors tags Go) : `make e2e` — specs `app/e2e/*` (projet `setup` : seed de l'owner tenant ; `chromium` : scénarios) contre le binaire Go servant `app/dist` (origine unique, port 9100) ; base `artisan_e2e` jetable recréée à chaque cycle, `FLUSHDB` purge l'index `REDIS_DB` (3 dans le cycle e2e) — les sessions dev (index 1) ne sont plus purgées, effet de bord attendu
 
 Conventions de test :
 
@@ -65,7 +67,7 @@ Conventions de test :
 - Helpers : `internal/testutil/factory.go` (factories), `fixtures.go` (chargeur), `postgres.go` (conteneur) — importés uniquement par des `*_test.go` (garde CI « fuite helpers »)
 - La suite d'intégration `all` garde ses conventions : séquentialité, RLS prouvée, rôles non-superuser, skips Redis
 - Secrets de test via `t.Setenv` (jamais de vraies clés), isolation via `t.Cleanup`, tests table-driven avec sous-tests quand pertinent
-- Tests Redis : skip si `REDIS_HOST` absent ; utiliser une base/instance de test dédiée ; les tests de parse de connexion exigent l'authentification `trust` PostgreSQL
+- Tests Redis : skip si `REDIS_HOST` absent ; répartition des index : 1 = sessions dev (défaut, `REDIS_DB` absent), 2 = suites Go, 3 = cycle e2e — toute création de client Redis dans un test passe par le `TestMain` du paquet (index 2 posé au niveau processus) ; les tests de parse de connexion exigent l'authentification `trust` PostgreSQL
 - Les tests se connectent en rôles non-superuser (`app_user`/`app_admin`) : une requête sans contexte tenant renvoie 0 ligne (RLS) et un insert cross-tenant lève 42501 — comportement attendu et testé, ne pas « corriger » en passant en superuser
 
 Règles obligatoires :
@@ -80,7 +82,7 @@ Règles obligatoires :
 - Dev local : dépendances en conteneurs Docker sur `127.0.0.1:15432` (PostgreSQL 18) et `127.0.0.1:16379` (Redis 8), compose `name: artisan-dev` (un seul projet quel que soit le clone) ; superuser `postgres/postgres` (conteneur dev uniquement), rôles applicatifs créés par la migration 000002 ; `SSL=FALSE` (API dev sur `http://localhost:9001`)
 - `ACCESS_SECRET`, `REFRESH_SECRET` et `ADMIN_ACCESS_SECRET` : ≥ 32 octets, générés indépendamment (`openssl rand -hex 32`) et tous différents — l'app refuse de démarrer sinon
 - `DB_USER`/`DB_PASS` : rôle applicatif `app_user` NON-superuser (RLS active) ; `DB_ADMIN_USER`/`DB_ADMIN_PASS` : rôle plateforme `app_admin` `BYPASSRLS` — les deux rôles sont créés par la migration 000002 elle-même ; mots de passe dev documentés dans la migration, la prod via `ALTER ROLE ... PASSWORD`
-- Variables principales : `PORT`, `ENV` (PRODUCTION → mode release), `SSL` (TRUE/FALSE), `DB_*`, `DB_ADMIN_*`, `REDIS_HOST`/`REDIS_PASSWORD`
+- Variables principales : `PORT`, `ENV` (PRODUCTION → mode release), `SSL` (TRUE/FALSE), `DB_*`, `DB_ADMIN_*`, `REDIS_HOST`/`REDIS_PASSWORD`, `REDIS_DB` (index du serveur Redis : défaut 1 = dev ; suites Go = 2 via `TestMain` ; cycle e2e = 3 via préfixe make/webServer) — **ne pas la poser dans `.env`** (le Makefile exporte `.env` à toutes les recettes, `make run` suivrait)
 - Schéma DB : migrations goose dans `db/migrations/` (`make migrate_up`) ; PK uuid (`gen_random_uuid()`, PostgreSQL ≥ 13), timestamps `timestamptz`, `updated_at` via trigger `set_updated_at()`
 - Toujours `-mod=readonly` sur les commandes go ; vérifier `go vet` et `make test` avant de terminer
 

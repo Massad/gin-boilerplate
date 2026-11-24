@@ -1,6 +1,7 @@
 // Command e2edb prepares the disposable environment of the end-to-end suite:
-// it recreates the target PostgreSQL database and flushes the Redis database
-// dedicated to the e2e sessions.
+// it recreates the target PostgreSQL database and flushes the Redis index
+// named by REDIS_DB (the e2e sessions index; refuses the dev index 1 when
+// REDIS_DB is unset).
 //
 // This binary owns DDL that the application must never run. Creating and
 // dropping a database is an operations task — the same family as the goose
@@ -18,13 +19,14 @@
 //
 // Usage:
 //
-//	E2E_DB_NAME=artisan_e2e go run ./cmd/e2edb
+//	E2E_DB_NAME=artisan_e2e REDIS_DB=3 go run ./cmd/e2edb
 //
 // The connection parameters are read from the environment (DB_HOST, DB_PORT,
 // E2E_DB_ADMIN_USER, E2E_DB_ADMIN_PASS, DB_USER, DB_PASS, SSL, REDIS_HOST,
-// REDIS_PASSWORD): the Makefile target fills them from .env and pins the
-// migration superuser (postgres/postgres). The superuser login comes from
-// E2E_DB_ADMIN_* when it is set, from DB_USER/DB_PASS otherwise.
+// REDIS_PASSWORD, REDIS_DB): the Makefile target fills them from .env and
+// pins the migration superuser (postgres/postgres) and REDIS_DB to 3. The
+// superuser login comes from E2E_DB_ADMIN_* when it is set, from
+// DB_USER/DB_PASS otherwise.
 package main
 
 import (
@@ -36,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Massad/gin-boilerplate/db"
 	"github.com/go-redis/redis/v7"
 	"github.com/jackc/pgx/v5"
 )
@@ -48,10 +51,6 @@ const (
 	// maintenanceDB is the database every statement runs against: a database
 	// cannot be dropped from inside itself.
 	maintenanceDB = "postgres"
-
-	// redisDBIndex is the Redis database dedicated to the e2e sessions (the
-	// application stores its sessions there).
-	redisDBIndex = 1
 
 	// timeout bounds the whole preparation.
 	timeout = 2 * time.Minute
@@ -77,10 +76,15 @@ func main() {
 }
 
 // run prepares the environment: the target database is recreated and the
-// Redis database is flushed.
+// Redis index named by REDIS_DB is flushed. The index is resolved before any
+// destructive step, so an unset REDIS_DB is refused here.
 func run(ctx context.Context, getenv func(string) string) error {
 	target := strings.TrimSpace(getenv("E2E_DB_NAME"))
 	if err := validateTarget(target, getenv("DB_NAME")); err != nil {
+		return err
+	}
+	index, err := redisFlushIndex(getenv)
+	if err != nil {
 		return err
 	}
 
@@ -90,7 +94,7 @@ func run(ctx context.Context, getenv func(string) string) error {
 	if err := recreateDatabase(ctx, getenv, target); err != nil {
 		return err
 	}
-	if err := flushRedis(ctx, getenv); err != nil {
+	if err := flushRedis(ctx, getenv, index); err != nil {
 		return err
 	}
 
@@ -115,6 +119,20 @@ func validateTarget(target, appDB string) error {
 		return fmt.Errorf("E2E_DB_NAME %q does not match the allowlist %s", target, targetDBPattern)
 	}
 	return nil
+}
+
+// redisFlushIndex resolves the Redis index through the shared parser of the
+// db package and refuses the dev index when REDIS_DB is unset: the e2e cycle
+// must never flush the dev sessions by accident.
+func redisFlushIndex(getenv func(string) string) (int, error) {
+	index, err := db.RedisDBIndex(getenv)
+	if err != nil {
+		return 0, err
+	}
+	if strings.TrimSpace(getenv("REDIS_DB")) == "" && index == db.DefaultRedisDB {
+		return 0, errors.New("REDIS_DB is unset: refusing to flush the dev Redis index (1)")
+	}
+	return index, nil
 }
 
 // recreateDatabase drops the target database (forcing the disconnection of
@@ -142,23 +160,23 @@ func recreateDatabase(ctx context.Context, getenv func(string) string, target st
 	return nil
 }
 
-// flushRedis empties the Redis database dedicated to the e2e sessions: the
-// session keys of a previous run must not survive.
-func flushRedis(ctx context.Context, getenv func(string) string) error {
+// flushRedis empties the Redis index given by the caller: the session keys
+// of a previous run must not survive.
+func flushRedis(ctx context.Context, getenv func(string) string, index int) error {
 	host := strings.TrimSpace(getenv("REDIS_HOST"))
 	if host == "" {
-		return errors.New("REDIS_HOST is empty: the e2e Redis database cannot be flushed")
+		return errors.New("REDIS_HOST is empty: the e2e Redis index cannot be flushed")
 	}
 	client := redis.NewClient(&redis.Options{
 		Addr:     host,
 		Password: getenv("REDIS_PASSWORD"),
-		DB:       redisDBIndex,
+		DB:       index,
 	}).WithContext(ctx)
 	defer func() { _ = client.Close() }()
 
-	fmt.Printf("Flushing the Redis database %d\n", redisDBIndex)
+	fmt.Printf("Flushing the Redis index %d\n", index)
 	if err := client.FlushDB().Err(); err != nil {
-		return fmt.Errorf("flush the Redis database %d: %w", redisDBIndex, err)
+		return fmt.Errorf("flush the Redis index %d: %w", index, err)
 	}
 	return nil
 }

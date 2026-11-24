@@ -61,7 +61,11 @@ results into `ACCESS_SECRET`, `REFRESH_SECRET`, and `ADMIN_ACCESS_SECRET`
 (the superadmin access tokens) in your local `.env`. Keep that file private.
 The application refuses to start with blank keys, keys shorter than 32 bytes,
 or identical keys. Redis authentication uses
-`REDIS_PASSWORD` when configured on your Redis server.
+`REDIS_PASSWORD` when configured on your Redis server. The `REDIS_DB`
+variable selects the Redis index: default 1 hosts the dev sessions, the Go
+suites pin index 2 through each package's `TestMain`, and the e2e cycle runs
+on index 3 — never set it in `.env`: the Makefile exports `.env` to every
+recipe, so `make run` would follow it.
 
 Start the dev dependency stack (Docker images `postgres:18-alpine` and
 `redis:8-alpine`, published loopback-only on `127.0.0.1:15432` /
@@ -156,7 +160,11 @@ make test
 
 Use a dedicated test database and Redis instance. The connection parser tests
 require PostgreSQL trust authentication because they exercise different password
-values. CI provisions disposable services for these checks.
+values. CI provisions disposable services for these checks. The dev stack
+isolates sessions by Redis index: the dev app runs on index 1 (default), the
+Go suites pin index 2 through each package's `TestMain`, and the e2e cycle
+runs on index 3 (`REDIS_DB=3`) — the test purge cycles never evict the dev
+sessions.
 
 ### SSL (Optional)
 

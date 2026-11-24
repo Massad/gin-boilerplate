@@ -44,6 +44,38 @@ func TestValidateTarget(t *testing.T) {
 	}
 }
 
+// TestRedisFlushIndex proves the Redis guard: an unset REDIS_DB is refused
+// (the dev index 1 is protected), an explicit index is accepted and a
+// malformed value is rejected.
+func TestRedisFlushIndex(t *testing.T) {
+	cases := []struct {
+		name    string
+		env     map[string]string
+		want    int
+		wantErr bool
+	}{
+		{name: "REDIS_DB unset is refused", env: nil, wantErr: true},
+		{name: "empty REDIS_DB is refused", env: map[string]string{"REDIS_DB": ""}, wantErr: true},
+		{name: "blank REDIS_DB is refused", env: map[string]string{"REDIS_DB": "   "}, wantErr: true},
+		{name: "explicit dev index is an opt-in", env: map[string]string{"REDIS_DB": "1"}, want: 1},
+		{name: "e2e index is accepted", env: map[string]string{"REDIS_DB": "3"}, want: 3},
+		{name: "malformed value is rejected", env: map[string]string{"REDIS_DB": "abc"}, wantErr: true},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			getenv := func(name string) string { return testCase.env[name] }
+			index, err := redisFlushIndex(getenv)
+			if testCase.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, testCase.want, index)
+		})
+	}
+}
+
 // TestSuperuserCredentials proves the superuser login comes from the
 // explicit E2E_DB_ADMIN_* variables and falls back to the application
 // credentials when they are absent.

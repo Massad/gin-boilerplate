@@ -152,7 +152,7 @@ PNPM ?= corepack pnpm
 e2e: services_up
 	@echo -e "🧪 Preparing the e2e database ($(E2E_DB_NAME))..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	E2E_DB_ADMIN_USER=postgres E2E_DB_ADMIN_PASS=postgres E2E_DB_NAME=$(E2E_DB_NAME) go run -mod=readonly ./cmd/e2edb
+	E2E_DB_ADMIN_USER=postgres E2E_DB_ADMIN_PASS=postgres E2E_DB_NAME=$(E2E_DB_NAME) REDIS_DB=3 go run -mod=readonly ./cmd/e2edb
 	@echo -e "🗄️  Applying the migrations on $(E2E_DB_NAME)..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
 	"$(MAKE)" --no-print-directory SHELL="$(SHELL)" migrate_up DB_NAME=$(E2E_DB_NAME) DB_USER=postgres DB_PASS=postgres DB_HOST="$$DB_HOST" DB_PORT="$$DB_PORT" SSL="$$SSL"

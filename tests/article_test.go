@@ -156,7 +156,8 @@ func TestIntDB(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, pgdb.InitTenant(ctx, os.Getenv), "initializing the tenant pool")
 	require.NoError(t, pgdb.InitAdmin(ctx, os.Getenv), "initializing the admin pool")
-	db.InitRedis(1)
+	require.NoError(t, db.InitRedis(), "resolving the Redis database index")
+	require.Equal(t, 2, db.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
 
 	// The suite's starting data is declarative: admin_user.yml carries the
 	// backoffice admin, while tenant/user/article start empty (the suite

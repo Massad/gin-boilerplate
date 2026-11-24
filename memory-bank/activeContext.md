@@ -23,10 +23,10 @@ Implémentation complète : items 1-30 faits et vérifiés, item 31 = ce fichier
 
 ### E2E — VERT (porte de phase 3 franchie cette session)
 
-- Harnais relu contre le contrat §E2E du plan, corrigé, **puis exécuté** : `cmd/e2edb` (drop/create de `artisan_e2e` en superuser épinglé `E2E_DB_ADMIN_USER/PASS` + `FLUSHDB` Redis db 1 ; garde durcie : refus si nom vide, `DB_NAME`, `postgres`, `template*`), cible `make e2e`, `app/playwright.config.ts` (webServer `go run .`, PORT 9100, `DB_NAME=artisan_e2e`, origine unique `app/dist`, projet `setup`), `app/e2e/setup.ts` (seed de l'owner tenant via `POST /v1/user/register`) + `app/e2e/login.spec.ts` (CUJ 1/2/3).
+- Harnais relu contre le contrat §E2E du plan, corrigé, **puis exécuté** : `cmd/e2edb` (drop/create de `artisan_e2e` en superuser épinglé `E2E_DB_ADMIN_USER/PASS` + `FLUSHDB` Redis db 1 ; garde durcie : refus si nom vide, `DB_NAME`, `postgres`, `template*`), cible `make e2e`, `app/playwright.config.ts` (webServer `go run .`, PORT 9100, `DB_NAME=artisan_e2e`, origine unique `app/dist`, projet `setup`), `app/e2e/setup.ts` (seed de l'owner tenant via `POST /v1/user/register`) + `app/e2e/login.spec.ts` (CUJ 1/2/3) (à la date du 2026-11-23 ; l'isolation des index 1/2/3 est en vigueur depuis le plan REDIS_DB).
 - **3 runs consécutifs de `make e2e` verts (4/4 tests)** ; chromium Playwright 1.65.1 installé sous WSL (une fois : `pnpm -C app exec playwright install chromium`). Détails du contrat retenus : emails `admin@e2e.local` (superadmin CLI) et `owner@e2e.local` (owner tenant seedé), assertions d'URL (`/admin`, `/`, `/login`).
 - Correctifs harnais : include vitest limité à `src/**` (sinon vitest collectait les specs Playwright → `pnpm test` en échec) ; `app/tsconfig.json` inclut `e2e` + `playwright.config.ts` (le harnais est désormais type-checké par `pnpm build`) ; `.gitignore` : `/e2edb` (+ `.exe`).
-- Effet de bord attendu du cycle : le `FLUSHDB` purge la base Redis 1 (sessions de l'app de dev).
+- Effet de bord attendu du cycle : le `FLUSHDB` purge la base Redis 1 (sessions de l'app de dev) (à la date du 2026-11-23 ; l'isolation des index 1/2/3 est en vigueur depuis le plan REDIS_DB — le `FLUSHDB` ne purge plus que l'index 3, les sessions dev subsistent en 1).
 
 ### Correctif hors périmètre (réparé cette session, non planifié)
 

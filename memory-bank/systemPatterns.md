@@ -9,7 +9,7 @@ db/queries/*.sql --sqlc--> internal/db/*.sql.go (généré, commité, ne pas éd
 db/migrations/*.sql (goose) ← schema source de sqlc
 ```
 
-- main.go : route `/v1`, `db.InitRedis`, `pgdb.InitTenant` + `pgdb.InitAdmin` (+ `Close`), CLI `-create-admin` avant tout démarrage HTTP (`runCreateAdmin` testable), fallback SPA.
+- main.go : route `/v1`, `db.InitRedis() error` (l'index vient de `REDIS_DB`), `pgdb.InitTenant` + `pgdb.InitAdmin` (+ `Close`), CLI `-create-admin` avant tout démarrage HTTP (`runCreateAdmin` testable), fallback SPA.
 
 ## Deux pools, deux rôles (défense en profondeur RLS)
 

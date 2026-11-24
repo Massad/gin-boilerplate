@@ -86,6 +86,9 @@ jobs:
           # Comment prose may mention the retired drivers; only quoted import
           # paths are regressions.
           ! grep -rEn '"(github\.com/)?(jmoiron/sqlx|lib/pq)"' --include='*.go' .
+      - name: Check no hardcoded Redis index
+        run: |
+          ! git grep -n "InitRedis(1)" -- '*.go'
       - name: Check test helper isolation
         run: |
           # internal/testutil carries test-only dependencies (gofakeit,

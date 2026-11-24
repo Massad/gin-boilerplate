@@ -54,7 +54,7 @@ export default defineConfig({
     cwd: "..",
     url: `${BASE_URL}/`,
     reuseExistingServer: false,
-    env: { PORT: E2E_PORT, DB_NAME: E2E_DB_NAME },
+    env: { PORT: E2E_PORT, DB_NAME: E2E_DB_NAME, REDIS_DB: "3" }, // index 3 isolates the e2e sessions (suites run on 2, dev on 1; never inherited from the runner or .env)
     timeout: 120_000,
   },
 })
