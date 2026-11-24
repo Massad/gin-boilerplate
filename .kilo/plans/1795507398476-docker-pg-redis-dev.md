@@ -19,9 +19,10 @@ fait squatter) motive des ports distinctifs — disposition complète en
 Redis sur **127.0.0.1:16379**, publiés en loopback uniquement.
 
 **Sort des données existantes** : l'ancienne base native `golang_gin_db`
-(goose v2, PG 15.19 natif) est abandonnée — aucune donnée à importer n'a été
-identifiée ; si des données locales devaient être conservées, les exporter
-avant `make services_up` (pg_dump natif) puis les importer dans le conteneur.
+(goose v2, PG 15.19 natif) est abandonnée par défaut — aucune donnée à
+importer n'a été identifiée ; si des données devaient être conservées, les
+exporter avant `make services_up` (démarrer le PG natif sur un port alternatif,
+pg_dump) puis les importer dans le conteneur.
 
 ## Objectif
 
@@ -36,7 +37,7 @@ migrations**, que la CI invoque aussi).
 projet (compose suivi en git) ; l'install native reste joignable en
 re-pointant `DB_PORT`/`REDIS_HOST` dans `.env` (documenté au README).
 **La CI est alignée sur les mêmes images** : `ci.yml` passe ses deux tags de
-services à `postgres:18-alpine`/`redis:8-alpine` (tâche 7) — parité
+services à `postgres:18-alpine`/`redis:8-alpine` (Fenêtre 4) — parité
 littérale : une seule chaîne d'image par dépendance, utilisée partout
 (compose, CI, testutil éphémère). La parité porte sur les images ; les ports
 CI restent ceux du runner (5432/6379 dans son propre conteneur de service,
@@ -48,8 +49,8 @@ sans conflit), le local garde 15432/16379.
 |---|---|
 | Image PostgreSQL | `postgres:18-alpine` |
 | Image Redis | `redis:8-alpine` |
-| Choix de version | Vérifié le 24 nov. 2026 via [endoflife.date/postgresql](https://endoflife.date/postgresql) : PG 18 (18.7, 14 mois de point releases, EOL nov. 2030) — PG 19.0 sorti le 19 nov. 2026 = trop frais (aucun point release) ; [endoflife.date/redis](https://endoflife.date/redis) : Redis 8 = ligne standard actuelle (7.4 en maintenance only depuis mai 2025) |
-| Parité CI | **Oui, littérale** — `ci.yml` aligné sur les mêmes tags que le compose (`postgres:18-alpine`/`redis:8-alpine`, tâche 7) et le testutil éphémère ; une seule chaîne d'image par dépendance |
+| Choix de version | Vérifié le 24 nov. 2026 via [endoflife.date/postgresql](https://endoflife.date/postgresql) : PG 18 (18.7, 14 mois de point releases, EOL nov. 2030) — PG 19.0 sorti le 19 nov. 2026 = trop frais (aucun point release) ; [endoflife.date/redis](https://endoflife.date/redis) : Redis 8 = ligne standard actuelle (7.4 en maintenance only depuis mai 2025). Tags vérifiés actifs sur Docker Hub (amd64) le 24 nov. 2026 |
+| Parité CI | **Oui, littérale** — `ci.yml` aligné sur les mêmes tags que le compose (`postgres:18-alpine`/`redis:8-alpine`, Fenêtre 4) et le testutil éphémère ; une seule chaîne d'image par dépendance |
 | Ports hôtes | `127.0.0.1:15432:5432`, `127.0.0.1:16379:6379` |
 | Superuser PG | `postgres/postgres` — épinglé par la cible `e2e` du Makefile (`E2E_DB_ADMIN_*`, Makefile:122) ; `cmd/e2edb` ne fait que lire ces variables |
 | Base PG | `POSTGRES_DB=golang_gin_db` (créée au premier boot du conteneur) |
@@ -58,7 +59,7 @@ sans conflit), le local garde 15432/16379.
 | SSL dev | `SSL=FALSE` — stack compose sans TLS (le `.env` local l'est déjà, le template est aligné) ; l'API dev répond sur `http://localhost:9001`. TLS natif hors stack : `generate-certificate.sh` au README |
 | Redis | Configuration par défaut de l'image (snapshots RDB, volume `/data`) — pas de mot de passe (`REDIS_PASSWORD` vide dans `.env`) |
 | Healthchecks | `pg_isready -h 127.0.0.1 -U postgres -d golang_gin_db` (sonde TCP : évite le faux positif sur la socket initdb) et `redis-cli ping` — équivalents CI, sonde TCP en plus côté PG |
-| Readiness | `docker compose up -d --wait` dans chaque cible make — **exige Compose ≥ v2.17** |
+| Readiness | `docker compose up -d --wait` dans chaque cible make — **exige Compose ≥ v2.17** (v5.7.0 vérifié sur ce poste) |
 | Persistance | Volumes nommés `pgdata` **monté sur `/var/lib/postgresql`** (disposition PG 18+ : l'image place PGDATA dans `/var/lib/postgresql/18/docker` et **refuse** un montage sur `/var/lib/postgresql/data`) et `redisdata` ; reset via `docker compose down -v` (documenté, pas de cible dédiée) |
 | Projet compose | `name: artisan-dev` — un seul projet compose quel que soit le nom du clone/worktree, sinon les conteneurs orphelins (redémarrés automatiquement) tiennent les ports avec un message trompeur |
 | Redémarrage | `restart: unless-stopped` (exposition pérenne assumée — voir Risques) |
@@ -76,11 +77,32 @@ sans conflit), le local garde 15432/16379.
 | alpine vs debian | alpine retenu (empreinte), adopté partout (compose, CI, testutil) — un seul flavour, plus de delta entre environnements |
 | Garder la CI en `postgres:15`/`redis:7` (report) | Écarté : le bump coûte deux lignes de tags et rend la parité littérale (une seule chaîne d'image partout) |
 
-## Tâches
+## Exécution multi-fenêtres
 
-**Phase 1 — Stack** (état stable : `docker compose config -q` passe)
+Le plan s'exécute en **5 fenêtres de contexte indépendantes**. Chaque
+fenêtre est auto-contenue : un agent **neuf** (aucun historique de
+conversation) lit ce plan + les fichiers listés, vérifie les critères
+d'entrée, exécute **strictement** le périmètre indiqué, prouve les critères
+de sortie. Ne jamais dépasser le périmètre d'une fenêtre.
 
-### 1. Créer `docker-compose.yml` (racine)
+**Protocole de reprise** : au démarrage d'une fenêtre, rejouer d'abord le
+check de sortie de la fenêtre précédente (idempotent) — s'il échoue, la
+fenêtre précédente n'est pas terminée. Une fenêtre = une session de travail.
+
+**Fait vérifié sur ce poste (24 nov. 2026)** : `sylvaindeb` ∈ groupe docker
+(gid 990), `docker ps` répond sans sudo, Docker Compose v5.7.0, poppler
+présent (pdftotext 25.03.0), tags Docker Hub actifs.
+
+---
+
+### Fenêtre 1 — `docker-compose.yml` (la stack seule)
+
+- **Objectif** : la stack démarre saine — aucun autre fichier du dépôt modifié.
+- **Charger** : ce plan (Décisions, Alternatives, cette fenêtre). Aucun fichier du dépôt à lire/modifier au-delà de la création.
+- **Entrée** : clone propre ; prérequis Docker vérifiés (cf. fait vérifié ci-dessus).
+- **Périmètre** : créer uniquement `docker-compose.yml` à la racine, contenu intégral ci-dessous. Rien d'autre.
+- **Sortie** : `docker compose config -q` passe ; `docker compose up -d --wait` → `docker compose ps` montre les deux services `healthy` ; `docker compose down` les arrête (volumes conservés).
+- **Main tendue** : ports 15432/16379 publiés en loopback ; `.env` et Makefile encore inchangés.
 
 ```yaml
 # Dev dependency stack: PostgreSQL + Redis for go-artisan-services.
@@ -125,9 +147,16 @@ volumes:
   redisdata:
 ```
 
-**Phase 2 — Makefile** (état stable : `make services_up` démarre une stack saine)
+### Fenêtre 2 — Makefile + `.env` (mécanique de configuration)
 
-### 2. Makefile — sourcing `.env`, cibles, prérequis
+- **Objectif** : source unique de configuration (`.env`), cibles make, prérequis — `make migrate_up` fonctionne de bout en bout.
+- **Charger** : ce plan (cette fenêtre, Tests, Risques) ; dépôt : `Makefile`, `.env`, `.env_rename_me`.
+- **Entrée** : sortie Fenêtre 1 rejouée (`docker compose config -q` + stack saine).
+- **Périmètre** : `Makefile` + `.env` + `.env_rename_me`. Aucun fichier Go, aucun doc.
+- **Sortie** : `make check_ports` passe ; `make services_up` → saine ; `make migrate_up DB_USER=postgres DB_PASS=postgres` applique 000001-000003 (vérifier les rôles : `docker compose exec postgres psql -U postgres -c '\du'` montre `app_user`/`app_admin`) ; `make services_down`.
+- **Main tendue** : la base `golang_gin_db` est migrée ; run/test/e2e ont leur prérequis ; le Makefile source le même `.env` que l'app.
+
+#### 2a. Makefile — sourcing `.env`, cibles, prérequis
 
 En tête du fichier (après le bloc SHELL) — source unique de configuration, le
 même `.env` que l'app (godotenv) ; **valeurs sans guillemets** (GNU make ne
@@ -167,6 +196,7 @@ services_down:
 
 ## FAIL IF COMPOSE AND .ENV DISAGREE ON PUBLISHED PORTS
 check_ports:
+	@test -f .env || { echo "missing .env — run 'cp .env_rename_me .env' first" >&2; exit 1; }
 	@pg="$(DB_PORT)"; redis="$$(printf '%s' "$(REDIS_HOST)" | sed 's/.*://')"; \
 	grep -q "\"127.0.0.1:$${pg}:5432\"" docker-compose.yml || { echo "drift: compose postgres != DB_PORT ($$pg)" >&2; exit 1; }; \
 	grep -q "\"127.0.0.1:$${redis}:6379\"" docker-compose.yml || { echo "drift: compose redis != REDIS_HOST ($$redis)" >&2; exit 1; }
@@ -194,13 +224,10 @@ migrate_down: install_goose
 
 `make run`/`make test`/`make e2e` démarrent les conteneurs avant d'agir ;
 `make migrate_up` lit le même `.env` que l'app via `-include` (plus d'export
-manuel nécessaire) et fonctionne dès que la stack tourne (l'étape 3 de la
-validation la précède). Le sous-make récursif de `e2e` retrouve la stack via
-le prérequis `e2e: services_up`.
+manuel nécessaire) et fonctionne dès que la stack tourne. Le sous-make
+récursif de `e2e` retrouve la stack via le prérequis `e2e: services_up`.
 
-**Phase 3 — Configuration** (état stable : `make migrate_up` réussit de bout en bout)
-
-### 3. `.env` et `.env_rename_me` — lignes exactes, sans guillemets
+#### 2b. `.env` et `.env_rename_me` — lignes exactes, sans guillemets
 
 **`.env_rename_me`** (template — valeurs déjà non guillemetées) :
 
@@ -222,16 +249,25 @@ REDIS_HOST=127.0.0.1:16379
 
 (`SSL=FALSE` y est déjà.) Aucune autre variable touchée.
 
-### 4. `internal/testutil/postgres.go` — alignement local (1 ligne)
+### Fenêtre 3 — testutil + preuve locale (`make test`)
 
-`postgres:16-alpine` → `postgres:18-alpine` (ligne 18). **Seule modification de
-fichier source du plan** : le conteneur éphémère opt-in doit exercer la même
-version que la stack (il passe de skip à run dès que Docker existe localement —
-voir Tests).
+- **Objectif** : une seule version d'image PG partout + la suite de tests verte contre la stack.
+- **Charger** : ce plan (cette fenêtre, Tests) ; dépôt : `internal/testutil/postgres.go`, `go.mod`.
+- **Entrée** : sortie Fenêtre 2 (stack saine + schéma migré).
+- **Périmètre** : **une ligne** dans `internal/testutil/postgres.go` : `postgres:16-alpine` → `postgres:18-alpine` (ligne 18). **Seule modification de fichier Go du plan.** Rien d'autre.
+- **Sortie** : `go vet -mod=readonly ./...` propre ; `make test` complet (tag `all`) **vert** — inclut `TestPostgresDSNPasswords` (trust), le test testcontainers (désormais run : pull postgres:18-alpine), `./invoice` (poppler vérifié présent). Tout doit passer ; si le seul échec est environnemental sur un poste tiers, le signaler comme tel.
+- **Main tendue** : la stack et la suite se prouvent mutuellement — les Fenêtres 4-5 documentent des faits établis ici.
 
-**Phase 4 — Documentation** (état stable : un nouveau dev démarre en trois commandes)
+### Fenêtre 4 — Documentation, CI, mémoire
 
-### 5. README.md
+- **Objectif** : le dépôt raconte la nouvelle stack ; CI en parité de tags ; mémoire du projet à jour.
+- **Charger** : ce plan (cette fenêtre) ; dépôt : `README.md`, `AGENTS.md`, `.github/workflows/ci.yml`, `memory-bank/techContext.md`, `memory-bank/activeContext.md`, `memory-bank/progress.md`, `.kilo/HANDOFF.md`.
+- **Entrée** : sorties Fenêtres 1-3 (les faits documentés sont vrais).
+- **Périmètre** : les quatre tâches ci-dessous. Aucun code applicatif.
+- **Sortie** : cohérence par grep — les sections mises à jour ne référencent plus 5432/6379 comme cible dev ; `git diff .github/workflows/ci.yml` ne montre **que** les deux tags ; AGENTS.md liste les nouvelles cibles et le contrat du schéma.
+- **Main tendue** : docs, CI et mémoire reflètent la stack réelle — la Fenêtre 5 n'a plus rien à corriger.
+
+#### 4a. README.md
 
 - **Prerequisites** (nouvelle puce) : « Docker avec Compose ≥ v2.17 — si
   `docker ps` refuse : `sudo usermod -aG docker <user>` puis re-login » ;
@@ -248,7 +284,7 @@ voir Tests).
   prérequis `services_up` (révert git du Makefile) + re-pointer
   `DB_PORT=5432`/`REDIS_HOST=127.0.0.1:6379` pour retrouver une stack native.
 
-### 6. AGENTS.md
+#### 4b. AGENTS.md
 
 - **Commandes** : ajouter `postgres_up`, `redis_up`, `services_up`,
   `services_down`, `check_ports` ; prérequis `services_up` sur `run`,
@@ -261,7 +297,7 @@ voir Tests).
   (compose `name: artisan-dev`), superuser postgres/postgres (conteneur dev
   uniquement), rôles applicatifs créés par la migration 000002, `SSL=FALSE`.
 
-### 7. `.github/workflows/ci.yml` — parité des tags
+#### 4c. `.github/workflows/ci.yml` — parité des tags
 
 Dans le job `test` (bloc `services`) : `image: postgres:15` →
 `postgres:18-alpine`, `image: redis:7` → `redis:8-alpine`. Rien d'autre ne
@@ -270,9 +306,7 @@ le healthcheck CI garde `pg_isready -U postgres` sans `-d` car la base
 `golang_gin_db` y est créée par psql **après** le démarrage du service
 (ci.yml:70), contrairement au compose où `POSTGRES_DB` la crée au boot.
 
-**Phase 5 — Mémoire du projet**
-
-### 8. memory-bank + HANDOFF
+#### 4d. memory-bank + HANDOFF
 
 - `techContext.md` : remplacer la **ligne 41 entière** (« PG 15.19 natif
   127.0.0.1:5432 … Redis 127.0.0.1:6379 … DB 1 = cache teable ») par l'état
@@ -283,7 +317,49 @@ le healthcheck CI garde `pg_isready -U postgres` sans `-d` car la base
 - `progress.md` : état de session (convention AGENTS.md:87).
 - `.kilo/HANDOFF.md` : la note « PG 15.19 natif » devient la stack docker.
 
-## Tests : ports, bases et commandes (vérifiés dans le code)
+### Fenêtre 5 — Validation de bout en bout
+
+- **Objectif** : la preuve finale — les 11 étapes ci-dessous, dans l'ordre.
+- **Charger** : ce plan (cette fenêtre, Tests, Risques).
+- **Entrée** : sorties Fenêtres 1-4.
+- **Périmètre** : exécution et vérification uniquement (plus aucune modification, sauf correction d'un écart découvert).
+- **Sortie** : les 11 étapes vertes ; `git status` + `git diff` passés en revue pour présentation (le commit reste à la demande de l'utilisateur).
+- **Main tendue** : plan terminé ; premier push = preuve CI.
+
+1. `docker compose config` — YAML valide ; `make check_ports` passe (compose
+   et `.env` d'accord).
+2. Pré-vol — **vérifié le 24 nov. 2026** : `sylvaindeb` ∈ groupe `docker`
+   (gid 990), `docker ps` répond sans sudo, Docker Compose **v5.7.0** (≥ v2.17
+   requise pour `--wait`). Le remède reste documenté au README Prerequisites
+   pour d'autres postes.
+3. `make postgres_up` puis `make redis_up` individuellement :
+   `docker compose ps` → `healthy` ; second appel idempotent.
+4. `make migrate_up DB_USER=postgres DB_PASS=postgres` → applique
+   000001-000003, crée les rôles ; le sourcing `.env` est celui du Makefile
+   (`-include`).
+5. `go run . -create-admin -email admin@example.com -password <dev-pass>`
+   → prouve le pool admin à travers 15432.
+6. `make run` → conteneurs healthy + app sur `:9001` (http, `SSL=FALSE`) ;
+   `curl http://127.0.0.1:9001/v1/articles` → 401 « Please login first ».
+7. Login e2e manuel (POST /v1/login, `admin@example.com` + **le même mot de
+   passe qu'à l'étape 5**) → session écrite dans le Redis conteneur (vérif
+   `docker compose exec redis redis-cli -n 1 keys '*'` — l'app utilise la
+   db 1, `main.go:144`) ; depuis Windows, vérifier l'accès à
+   `127.0.0.1:15432` (localhost-forwarding).
+8. `make test` complet (tag `all`) — inclut `TestPostgresDSNPasswords` (passe
+   grâce à trust) et le test testcontainers (run au lieu de skip, pull
+   postgres:18-alpine). `./invoice` est attendu vert (poppler vérifié
+   présent, pdftotext 25.03.0). Tout doit passer.
+9. `make services_down` → stop ; `make services_up` → relance, données
+   conservées (les sessions survivent — volume `pgdata` réellement attaché à
+   `/var/lib/postgresql`).
+10. Optionnel : `make e2e` cycle complet contre les conteneurs (valide le
+    prérequis `e2e: services_up` et la recréation autonome d'`artisan_e2e`).
+11. Preuve de parité : le `make test` local de l'étape 8 tourne sur PG 18 +
+    Redis 8 — les mêmes tags d'images que la CI (`ci.yml` aligné, Fenêtre 4) ;
+    le push suivant le confirme sur le runner.
+
+## Tests : ports, bases et commandes (vérifiés dans le code — référence pour toutes les fenêtres)
 
 - **Contrat de démarrage** : `services_up` = cluster sain ; `make migrate_up`
   (superuser) = schéma ; `run`/`test`/`e2e` démarrent les conteneurs mais ne
@@ -325,43 +401,6 @@ le healthcheck CI garde `pg_isready -U postgres` sans `-d` car la base
   localhost-forwarding WSL2 (observé sur les ports docker existants — netstat,
   PID wslrelay) ; vérifié à l'étape 7 de la validation, pas seulement affirmé.
 
-## Validation (dans l'ordre)
-
-1. `docker compose config` — YAML valide ; `make check_ports` passe (compose
-   et `.env` d'accord).
-2. Pré-vol — **vérifié le 24 nov. 2026** : `sylvaindeb` ∈ groupe `docker`
-   (gid 990), `docker ps` répond sans sudo, Docker Compose **v5.7.0** (≥ v2.17
-   requise pour `--wait`). Le remède reste documenté au README Prerequisites
-   pour d'autres postes (`sudo usermod -aG docker <user>` + re-login).
-3. `make postgres_up` puis `make redis_up` individuellement :
-   `docker compose ps` → `healthy` ; second appel idempotent.
-4. `make migrate_up DB_USER=postgres DB_PASS=postgres` → applique
-   000001-000003, crée les rôles ; le sourcing `.env` est celui du Makefile
-   (`-include`).
-5. `go run . -create-admin -email admin@example.com -password <dev-pass>`
-   → prouve le pool admin à travers 15432.
-6. `make run` → conteneurs healthy + app sur `:9001` (http, `SSL=FALSE`) ;
-   `curl http://127.0.0.1:9001/v1/articles` → 401 « Please login first ».
-7. Login e2e manuel (POST /v1/login, `admin@example.com` + **le même mot de
-   passe qu'à l'étape 5**) → session écrite dans le Redis conteneur (vérif
-   `docker compose exec redis redis-cli -n 1 keys '*'` — l'app utilise la
-   db 1, `main.go:144`) ; depuis Windows, vérifier l'accès à
-   `127.0.0.1:15432` (localhost-forwarding).
-8. `make test` complet (tag `all`) — inclut `TestPostgresDSNPasswords` (passe
-   grâce à trust) et désormais le test testcontainers (run au lieu de skip,
-   pull postgres:18-alpine). `./invoice` est attendu vert (poppler vérifié
-   présent, pdftotext 25.03.0) ; si un poste sans poppler échoue sur ce seul
-   paquet, le signaler comme environnement et non régression. Tout doit
-   passer.
-9. `make services_down` → stop ; `make services_up` → relance, données
-   conservées (les sessions survivent — volume `pgdata` réellement attaché à
-   `/var/lib/postgresql`).
-10. Optionnel : `make e2e` cycle complet contre les conteneurs (valide le
-    prérequis `e2e: services_up` et la recréation autonome d'`artisan_e2e`).
-11. Preuve de parité : le `make test` local de l'étape 8 tourne sur PG 18 +
-    Redis 8 — les mêmes tags d'images que la CI (`ci.yml` aligné, tâche 7) ;
-    le push suivant le confirme sur le runner.
-
 ## Risques / cas d'échec
 
 - **Docker daemon arrêté** ou Compose < v2.17 : `make run`/`make test`/
@@ -372,8 +411,8 @@ le healthcheck CI garde `pg_isready -U postgres` sans `-d` car la base
   les **trois** fichiers — `docker-compose.yml`, `.env`, `.env_rename_me` —
   en sync.
 - **Dérive compose/`.env`** : détectée par `make check_ports` (exit 1 avec le
-  détail), appelé par `services_up` avant chaque démarrage — pas seulement un
-  commentaire.
+  détail, et message dédié si `.env` manque), appelé par `services_up` avant
+  chaque démarrage — pas seulement un commentaire.
 - **`down -v`** : destructif (base + sessions Redis) — documenté, pas de
   cible make dédiée pour éviter les accidents de complétion.
 - **Trust auth dev** : le localhost-forwarding WSL2 expose les ports publiés

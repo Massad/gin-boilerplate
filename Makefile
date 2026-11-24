@@ -7,12 +7,45 @@ SHELL := C:/Program Files/Git/bin/sh.exe
 endif
 endif
 
+## Single configuration source: the same .env the application reads.
+## Values must stay unquoted: GNU make -include parses assignments but does
+## not strip quotes (godotenv and the shell do, which would hide the drift).
+-include .env
+export
+DB_HOST ?= 127.0.0.1
+DB_PORT ?= 5432
+DB_NAME ?= golang_gin_db
+
 ## The targets never create a file named after themselves: they must always run.
 .PHONY: run test e2e migrate_up migrate_down generate_docs install_swag \
-	generate_sqlc install_sqlc generate_mocks install_mockery install_goose
+	generate_sqlc install_sqlc generate_mocks install_mockery install_goose \
+	postgres_up redis_up services_up services_down check_ports
+
+## START THE DEV POSTGRESQL CONTAINER (waits for health)
+postgres_up:
+	@docker compose up -d --wait postgres
+
+## START THE DEV REDIS CONTAINER (waits for health)
+redis_up:
+	@docker compose up -d --wait redis
+
+## START BOTH DEV CONTAINERS
+services_up: check_ports
+	@docker compose up -d --wait
+
+## STOP THE DEV CONTAINERS (named volumes preserved; add -v to wipe)
+services_down:
+	@docker compose down
+
+## FAIL IF COMPOSE AND .ENV DISAGREE ON PUBLISHED PORTS
+check_ports:
+	@test -f .env || { echo "missing .env — run 'cp .env_rename_me .env' first" >&2; exit 1; }
+	@pg="$(DB_PORT)"; redis="$$(printf '%s' "$(REDIS_HOST)" | sed 's/.*://')"; \
+	grep -q "\"127.0.0.1:$${pg}:5432\"" docker-compose.yml || { echo "drift: compose postgres != DB_PORT ($$pg)" >&2; exit 1; }; \
+	grep -q "\"127.0.0.1:$${redis}:6379\"" docker-compose.yml || { echo "drift: compose redis != REDIS_HOST ($$redis)" >&2; exit 1; }
 
 ## RUN APPLICATION
-run:
+run: services_up
 	@echo -e "🚀 Running the application..."
 	@go run .
 
@@ -25,7 +58,7 @@ run:
 ## - -p 1 serializes the packages: the suites share one PostgreSQL/Redis and
 ##   the fixtures purge at suite start must not race the isolated-service
 ##   packages seeding their own rows (convention AGENTS.md : suite séquentielle).
-test:
+test: services_up
 	@echo -e "🔍 Running tests..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
 	case "$$(uname -s)" in *MSYS*|*MINGW*) \
@@ -116,7 +149,7 @@ PNPM ?= corepack pnpm
 ## - Applies the migrations as the migration superuser, then seeds the superadmin.
 ## - Builds the frontend and runs the Playwright suite against the Go binary
 ##   serving app/dist (single origin, port 9100).
-e2e:
+e2e: services_up
 	@echo -e "🧪 Preparing the e2e database ($(E2E_DB_NAME))..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
 	E2E_DB_ADMIN_USER=postgres E2E_DB_ADMIN_PASS=postgres E2E_DB_NAME=$(E2E_DB_NAME) go run -mod=readonly ./cmd/e2edb

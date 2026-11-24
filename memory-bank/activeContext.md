@@ -57,7 +57,7 @@ Implémentation complète : items 1-30 faits et vérifiés, item 31 = ce fichier
 - Le Go **Windows** ne peut pas builder sur le partage `\\wsl.localhost\...` (`RLock: Fonction incorrecte`) → **toutes** les commandes (go / make / git / pnpm) se jouent via `wsl -d Debian -- bash -lc 'cd /home/sylvaindeb/projects/go-artisan-services && …'` ; le Go WSL n'est pas dans le PATH par défaut (`export PATH=/usr/local/go/bin:$PATH`).
 - `pnpm` **uniquement sous WSL** : `app/node_modules` y est installé (liens symboliques Linux) ; pnpm côté Windows tente de purger le dossier (`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`).
 - `pdftotext` (poppler-utils) installé sous WSL → les tests PDF de `./invoice` peuvent y tourner.
-- WSL : PostgreSQL (127.0.0.1:5432) et Redis (127.0.0.1:6379) joignables, port 9100 libre (serveur e2e).
+- WSL : PostgreSQL (127.0.0.1:15432) et Redis (127.0.0.1:16379) joignables — stack Docker `artisan-dev` (`make services_up`) ; port 9100 libre (serveur e2e).
 - PowerShell 5.1 : pas de heredoc, pas de `&&` ; passer par `wsl -d Debian -- bash -lc` pour les enchaînements.
 - Piège d'outillage : la capture de sortie console perd les blocs contenant des caractères non-ASCII → écrire les sorties dans un fichier (`> /tmp/x.txt`) puis le relire.
 

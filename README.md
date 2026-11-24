@@ -27,8 +27,12 @@ The fastest way to deploy a RESTful API with [Gin Framework](https://github.com/
 ### Prerequisites
 
 - Go 1.26.10+
-- PostgreSQL 13+ (uuid primary keys use `gen_random_uuid()`)
-- Redis
+- Docker with Compose ≥ v2.17 (recommended) — the dev dependency stack starts
+  with `make services_up`. If `docker ps` refuses permission:
+  `sudo usermod -aG docker <user>` then log in again.
+- A native PostgreSQL 13+ (uuid primary keys use `gen_random_uuid()`) and
+  Redis also work, as long as `DB_PORT` and `REDIS_HOST` are re-pointed in
+  `.env` (e.g. `5432` and `127.0.0.1:6379`).
 
 ### Setup
 
@@ -59,35 +63,29 @@ The application refuses to start with blank keys, keys shorter than 32 bytes,
 or identical keys. Redis authentication uses
 `REDIS_PASSWORD` when configured on your Redis server.
 
+Start the dev dependency stack (Docker images `postgres:18-alpine` and
+`redis:8-alpine`, published loopback-only on `127.0.0.1:15432` /
+`127.0.0.1:16379`):
+
+```bash
+make services_up
+```
+
 Run the database migrations. The first run needs a PostgreSQL superuser
 because the migrations themselves create the `app_user` and `app_admin`
 application roles (the application must never connect as the superuser) —
-override `DB_USER`/`DB_PASS` just for this command.
-
-**macOS / Linux (bash):**
+override `DB_USER`/`DB_PASS` just for this command. The Makefile reads the
+same `.env` as the application (`-include .env`), so no manual export of the
+database variables is needed:
 
 ```bash
-set -a
-. ./.env
-set +a
-make migrate_up DB_USER=postgres DB_PASS='<superuser password>'
-```
-
-**Windows (PowerShell):** export the variables from `.env` for the current
-session, then run the same command:
-
-```powershell
-Get-Content .env | ForEach-Object {
-    if ($_ -match '^\s*#' -or $_ -notmatch '=') { return }
-    $name, $value = $_.Split('=', 2)
-    $value = ($value.Trim() -replace '^"(.*)"$', '$1' -replace "^'(.*)'$", '$1')
-    Set-Item -Path "env:$name" -Value $value
-}
 make migrate_up DB_USER=postgres DB_PASS='<superuser password>'
 ```
 
 `make` must be available on Windows (for example `choco install make`);
-under WSL, follow the macOS/Linux commands above.
+under WSL, run these commands inside the distribution. Starting the
+containers does not replace the first migration: `services_up` boots an
+empty cluster, and `make migrate_up` creates the schema.
 
 Migrations are versioned SQL files in `db/migrations/`, managed with
 [goose](https://github.com/pressly/goose). All application queries live in
@@ -99,6 +97,11 @@ Migrations are versioned SQL files in `db/migrations/`, managed with
   (login, registration, admin backoffice)
 - In production, set the application role passwords with
   `ALTER ROLE ... PASSWORD`
+
+To leave the Docker dev stack and go back to native services: stop it with
+`docker compose down` (add `-v` to also wipe the data), remove the
+`services_up` prerequisites from the Makefile (git), and re-point `.env` to
+the native instance (`DB_PORT=5432`, `REDIS_HOST=127.0.0.1:6379`).
 
 Create the superadmin account (CLI bootstrap, no HTTP route involved):
 
@@ -142,8 +145,9 @@ go test -mod=readonly -count=1 -race -v ./invoice
 ```
 
 The full integration suite also requires running PostgreSQL and Redis.
-`make test` sources `.env` automatically before the tools run, so no manual
-export is needed. On Windows, make also masks Git-for-Windows' bundled
+`make test` starts the Docker dev stack first (prerequisite `services_up`)
+and sources `.env` automatically before the tools run, so no manual export
+is needed. On Windows, make also masks Git-for-Windows' bundled
 `pdftotext` from the recipe PATH so the suite resolves the real poppler.
 
 ```bash
@@ -155,6 +159,9 @@ require PostgreSQL trust authentication because they exercise different password
 values. CI provisions disposable services for these checks.
 
 ### SSL (Optional)
+
+The Docker dev stack runs without TLS: keep `SSL=FALSE` and the API answers
+on `http://localhost:9001`.
 
 To enable SSL, set `SSL=TRUE` in `.env` and generate certificates:
 

@@ -24,7 +24,7 @@ Conventions : `AGENTS.md` (racine, mise à jour à l'étape 12). Toujours `-mod=
 ## Environnement d'exécution (référence)
 
 - `wsl.exe -d Debian -- bash -lc '<cmd>'` pour les commandes simples ; scripts complexes dans `.kilo/*.sh` (écrire puis exécuter — inline nested quotes cassées par wsl.exe) ; `export PATH=$PATH:/usr/local/go/bin` (Go 1.27.4).
-- PG 15.19 `127.0.0.1:5432` (superuser `postgres`/`postgres` trust, uniquement pour `make migrate_up`), base `golang_gin_db` (goose version 2), Redis sans mot de passe `127.0.0.1:6379` (DB 1 cache teable), `.env` local sur `app_user`/`app_admin` (non commité).
+- Stack dev Docker (`docker-compose.yml`, projet `artisan-dev`) : PostgreSQL `postgres:18-alpine` `127.0.0.1:15432` (superuser `postgres`/`postgres` trust, uniquement pour `make migrate_up`), base `golang_gin_db` (goose version 3), Redis `redis:8-alpine` sans mot de passe `127.0.0.1:16379` (DB 1 dédiée à ce projet), `.env` local sur `app_user`/`app_admin` (non commité).
 - Exception connue : `./invoice` (test PDF) exige `pdftotext` (poppler), non installable sans sudo en WSL — la CI l'installe. Port 9000 occupé (conteneur teable) : pas de smoke local.
 
 ## Pièges pour une reprise éventuelle

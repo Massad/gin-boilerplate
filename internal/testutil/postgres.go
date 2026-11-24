@@ -15,7 +15,7 @@ import (
 )
 
 // ephemeralPostgresImage is the frozen disposable PostgreSQL used opt-in.
-const ephemeralPostgresImage = "postgres:16-alpine"
+const ephemeralPostgresImage = "postgres:18-alpine"
 
 // EphemeralPostgres carries the connection details of the disposable
 // instance: the raw host/port consumed by Env to wire the migration-created
