@@ -164,7 +164,9 @@ values. CI provisions disposable services for these checks. The dev stack
 isolates sessions by Redis index: the dev app runs on index 1 (default), the
 Go suites pin index 2 through each package's `TestMain`, and the e2e cycle
 runs on index 3 (`REDIS_DB=3`) — the test purge cycles never evict the dev
-sessions.
+sessions. `make test` also recreates the disposable `artisan_test` database
+(migrations included), and the suites pin it via each package's `TestMain`:
+the dev PostgreSQL database is never written by the tests.
 
 ### SSL (Optional)
 

@@ -35,8 +35,11 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	require.Equal(t, 2, db.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
 	t.Cleanup(func() { _ = db.GetRedis().Close() })
 	require.NoError(t, db.GetRedis().Ping().Err())
-	require.NoError(t, pgdb.InitTenant(context.Background(), os.Getenv))
-	require.NoError(t, pgdb.InitAdmin(context.Background(), os.Getenv))
+	require.NoError(t, pgdb.InitTenant(context.Background(), os.Getenv), "initializing the tenant pool: if the error says the database does not exist, run make test once to provision artisan_test; never falls back to the dev database")
+	require.NoError(t, pgdb.InitAdmin(context.Background(), os.Getenv), "initializing the admin pool: if the error says the database does not exist, run make test once to provision artisan_test; never falls back to the dev database")
+	var suiteDB string
+	require.NoError(t, pgdb.AdminStore().Pool.QueryRow(context.Background(), "SELECT current_database()").Scan(&suiteDB))
+	require.Equal(t, "artisan_test", suiteDB, "the suite must run on the disposable database artisan_test")
 
 	// Seed a tenant and its owner on the platform pool, from the seeded
 	// factories (unique slug and email per test name).

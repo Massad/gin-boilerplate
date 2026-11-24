@@ -72,6 +72,11 @@ jobs:
           # blocks) and must run as a superuser; the tests then connect as
           # app_user/app_admin so the row level security is actually exercised.
           make migrate_up DB_USER=postgres DB_PASS=postgres
+          # The Go suites run on the disposable artisan_test database
+          # (pinned by each package's TestMain); the smoke binary keeps
+          # golang_gin_db.
+          E2E_DB_ADMIN_USER=postgres E2E_DB_ADMIN_PASS=postgres E2E_DB_NAME=artisan_test REDIS_DB=2 go run -mod=readonly ./cmd/e2edb
+          make migrate_up DB_NAME=artisan_test DB_USER=postgres DB_PASS=postgres
       - name: Build and vet
         run: |
           go mod verify

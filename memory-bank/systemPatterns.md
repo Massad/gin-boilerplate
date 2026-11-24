@@ -38,5 +38,5 @@ pgdb.WithTenant(ctx, tenantID, func(q *pgdb.Queries) error { … })
 
 ## Tests (pattern à respecter pour toute feature)
 
-- Unitaires sans tag (config secrets, tenant slugify) + intégration sous `//go:build all` (httptest + `SetupRouter`, suite séquentielle à variables de package : `TestIntDB` init, `TestCleanUp` cleanup ciblé).
+- Unitaires sans tag (config secrets, tenant slugify) + intégration sous `//go:build all` (httptest + `SetupRouter`, suite séquentielle à variables de package : `TestIntDB` init, `TestCleanUp` cleanup ciblé) exécutée sur la base jetable `artisan_test` (`DB_NAME` épinglé par le `TestMain` du paquet, recréée+migrée par chaque `make test`).
 - La CI tourne en rôles non-superuser → la RLS est réellement prouvée ; une requête sans contexte renvoie 0 ligne et un insert cross-tenant lève 42501 : comportement **attendu**, ne jamais « corriger » au superuser.

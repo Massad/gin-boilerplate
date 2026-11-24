@@ -68,3 +68,4 @@ Implémentation complète : items 1-30 faits et vérifiés, item 31 = ce fichier
 - 2026-11-23 (matin) : stack de test Go (mockery, gofakeit, testfixtures, testcontainers, goose v3.20.0) + helpers `internal/testutil/`.
 - 2026-11-23 (après-midi) : plan login simple — phase backend (items 1-10) puis phase frontend (items 11-23).
 - 2026-11-23 (soir) : phase e2e exécutée et verte, CI + AGENTS.md + memory bank (items 29-31) ; puis passe de correction du drift (3 divergences) et vérification finale close (gofmt, sqlc, docs, `make test` verts ; `app/dist` détracké et commité).
+- 2026-11-24 (soir) : isolation des index Redis (plan REDIS_DB — dev 1, suites Go 2, cycle e2e 3) + base jetable PostgreSQL `artisan_test` pour les suites Go (plan PG, `DB_NAME` épinglé par `TestMain`, provisioning dans `make test`) ; `make test` et `make e2e` verts, marqueurs dev intacts.

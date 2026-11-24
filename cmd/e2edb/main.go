@@ -1,7 +1,9 @@
-// Command e2edb prepares the disposable environment of the end-to-end suite:
-// it recreates the target PostgreSQL database and flushes the Redis index
-// named by REDIS_DB (the e2e sessions index; refuses the dev index 1 when
-// REDIS_DB is unset).
+// Command e2edb prepares a disposable environment: it recreates the target
+// PostgreSQL database and flushes the Redis index named by REDIS_DB (the
+// target suite's sessions index; refuses the dev index 1 when REDIS_DB is
+// unset). It serves both disposable suites: the e2e cycle (artisan_e2e,
+// REDIS_DB=3) and the Go suites (artisan_test, REDIS_DB=2) — each Makefile
+// target pins its own pair.
 //
 // This binary owns DDL that the application must never run. Creating and
 // dropping a database is an operations task — the same family as the goose
@@ -20,11 +22,13 @@
 // Usage:
 //
 //	E2E_DB_NAME=artisan_e2e REDIS_DB=3 go run ./cmd/e2edb
+//	E2E_DB_NAME=artisan_test REDIS_DB=2 go run ./cmd/e2edb
 //
 // The connection parameters are read from the environment (DB_HOST, DB_PORT,
 // E2E_DB_ADMIN_USER, E2E_DB_ADMIN_PASS, DB_USER, DB_PASS, SSL, REDIS_HOST,
 // REDIS_PASSWORD, REDIS_DB): the Makefile target fills them from .env and
-// pins the migration superuser (postgres/postgres) and REDIS_DB to 3. The
+// pins the migration superuser (postgres/postgres) and REDIS_DB to the
+// target suite's index (e2e: 3, Go suites: 2). The
 // superuser login comes from E2E_DB_ADMIN_* when it is set, from
 // DB_USER/DB_PASS otherwise.
 package main

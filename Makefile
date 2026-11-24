@@ -50,6 +50,7 @@ run: services_up
 	@go run .
 
 ## RUN TESTS
+## - Recreates the disposable artisan_test database and applies the migrations before the suites (the dev database is never touched).
 ## - Sources .env first (set -a exports the sourced assignments) so the tagged
 ##   integration tests see DB_*/REDIS_* without a manual shell export.
 ## - Drops Git-for-Windows' bundled xpdf pdftotext (v4.00, layout incompatible
@@ -59,6 +60,12 @@ run: services_up
 ##   the fixtures purge at suite start must not race the isolated-service
 ##   packages seeding their own rows (convention AGENTS.md : suite séquentielle).
 test: services_up
+	@echo -e "🧪 Preparing the disposable test database (artisan_test)..."
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	E2E_DB_ADMIN_USER=postgres E2E_DB_ADMIN_PASS=postgres E2E_DB_NAME=artisan_test REDIS_DB=2 go run -mod=readonly ./cmd/e2edb
+	@echo -e "🗄️  Applying the migrations on artisan_test..."
+	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
+	"$(MAKE)" --no-print-directory SHELL="$(SHELL)" migrate_up DB_NAME=artisan_test DB_USER=postgres DB_PASS=postgres DB_HOST="$$DB_HOST" DB_PORT="$$DB_PORT" SSL="$$SSL"
 	@echo -e "🔍 Running tests..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
 	case "$$(uname -s)" in *MSYS*|*MINGW*) \

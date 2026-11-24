@@ -154,8 +154,11 @@ func TestIntDB(t *testing.T) {
 	require.NoError(t, err, "loading .env: please create one in the root directory")
 
 	ctx := context.Background()
-	require.NoError(t, pgdb.InitTenant(ctx, os.Getenv), "initializing the tenant pool")
-	require.NoError(t, pgdb.InitAdmin(ctx, os.Getenv), "initializing the admin pool")
+	require.NoError(t, pgdb.InitTenant(ctx, os.Getenv), "initializing the tenant pool: if the error says the database does not exist, run make test once to provision artisan_test; never falls back to the dev database")
+	require.NoError(t, pgdb.InitAdmin(ctx, os.Getenv), "initializing the admin pool: if the error says the database does not exist, run make test once to provision artisan_test; never falls back to the dev database")
+	var suiteDB string
+	require.NoError(t, pgdb.AdminStore().Pool.QueryRow(ctx, "SELECT current_database()").Scan(&suiteDB))
+	require.Equal(t, "artisan_test", suiteDB, "the suite must run on the disposable database artisan_test")
 	require.NoError(t, db.InitRedis(), "resolving the Redis database index")
 	require.Equal(t, 2, db.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
 
@@ -906,6 +909,10 @@ func TestAdminLogout(t *testing.T) {
  */
 func TestCleanUp(t *testing.T) {
 	ctx := context.Background()
+
+	var suiteDB string
+	require.NoError(t, pgdb.AdminStore().Pool.QueryRow(ctx, "SELECT current_database()").Scan(&suiteDB))
+	require.Equal(t, "artisan_test", suiteDB, "the suite must run on the disposable database artisan_test")
 
 	_, err := pgdb.AdminStore().Pool.Exec(ctx, "DELETE FROM public.tenant")
 	require.NoError(t, err)
