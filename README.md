@@ -241,6 +241,47 @@ details.
 CI runs an independent `frontend` job (frozen-lockfile install, lint, build,
 Storybook build smoke) next to the Go pipeline.
 
+## End-to-End Testing (Playwright)
+
+The E2E suite lives in `app/e2e/` and runs against a disposable database
+(`artisan_e2e`) recreated at every cycle. The Go binary serves the built SPA
+(`app/dist`) on a single origin (port 9100).
+
+### Full Cycle
+
+```bash
+make e2e
+```
+
+This recreates the test database, runs migrations, seeds the superadmin and
+owner tenant, builds the SPA, and executes the Playwright specs.
+
+### Headed (Visual) Mode
+
+By default Playwright runs headless. To watch the browser execute tests:
+
+```bash
+# From the app/ directory
+pnpm exec playwright test --headed
+```
+
+Or use the Playwright UI for step-by-step debugging, traces, and watch mode:
+
+```bash
+pnpm exec playwright test --ui
+```
+
+> **WSL note**: On Windows 11, WSLg provides a Wayland compositor so headed
+> Chromium windows appear on the Windows desktop automatically. On WSL 2
+> without WSLg, you need an X server (e.g., VcXsrv) and `$DISPLAY` set.
+
+### Prerequisites
+
+- One-time browser install: `pnpm -C app exec playwright install chromium`
+- PostgreSQL + Redis running
+- `.env` present at the repo root
+- `app/dist` built (done automatically by `make e2e`)
+
 ## Trusted Proxies & CORS
 
 By default, `SetTrustedProxies(nil)` is configured — Gin will not trust any proxy headers. If you deploy behind a reverse proxy (nginx, CloudFlare, etc.), set your trusted proxy IPs:

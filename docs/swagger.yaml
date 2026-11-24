@@ -439,7 +439,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Unified login: tenant user first, superadmin fallback'
+      description: |-
+        Unified login: tenant user first, superadmin fallback
+        The response is discriminated by kind: kind=tenant_user carries user, tenant and an access/refresh token pair; kind=superadmin carries admin and an access token only (no refresh_token).
       parameters:
       - description: Auth
         in: body

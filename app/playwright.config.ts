@@ -22,7 +22,7 @@ const E2E_PORT = process.env.E2E_PORT ?? "9100"
 const E2E_DB_NAME = process.env.E2E_DB_NAME ?? "artisan_e2e"
 
 /** The single origin of the suite: the SPA and the API are served together. */
-const BASE_URL = `http://127.0.0.1:${E2E_PORT}`
+const BASE_URL = `http://localhost:${E2E_PORT}`
 
 export default defineConfig({
   testDir: "./e2e",

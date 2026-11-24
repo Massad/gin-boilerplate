@@ -38,7 +38,13 @@ func StartEphemeralPostgres(t *testing.T) EphemeralPostgres {
 			Image:        ephemeralPostgresImage,
 			Env:          map[string]string{"POSTGRES_USER": "goose", "POSTGRES_PASSWORD": "ephemeral-test-password", "POSTGRES_DB": "ephemeral_gin_boilerplate"},
 			ExposedPorts: []string{"5432/tcp"},
-			WaitingFor:   wait.ForListeningPort("5432/tcp"),
+			// The port opens before the server accepts the connections: the
+			// entrypoint logs the readiness line twice (temporary server, then
+			// the real one), and the second occurrence is the accepting server.
+			WaitingFor: wait.ForAll(
+				wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+				wait.ForListeningPort("5432/tcp"),
+			),
 		},
 		Started: true,
 	})

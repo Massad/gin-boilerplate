@@ -10,18 +10,21 @@
 // test environment.
 //
 // The guard rails come first: the tool refuses to touch a database whose name
-// is empty, whose name is the application database (DB_NAME) or whose name
-// does not match the strict allowlist ^[a-z][a-z0-9_]{2,62}$. The identifier
-// is then quoted by pgx.Identifier.Sanitize, so no user-supplied value ever
-// reaches a statement as raw text.
+// is empty, whose name is the application database (DB_NAME), whose name is a
+// protected cluster database or whose name does not match the strict
+// allowlist ^[a-z][a-z0-9_]{2,62}$. The identifier is then quoted by
+// pgx.Identifier.Sanitize, so no user-supplied value ever reaches a statement
+// as raw text.
 //
 // Usage:
 //
 //	E2E_DB_NAME=artisan_e2e go run ./cmd/e2edb
 //
 // The connection parameters are read from the environment (DB_HOST, DB_PORT,
-// DB_USER, DB_PASS, SSL, REDIS_HOST, REDIS_PASSWORD): the Makefile target
-// fills them from .env.
+// E2E_DB_ADMIN_USER, E2E_DB_ADMIN_PASS, DB_USER, DB_PASS, SSL, REDIS_HOST,
+// REDIS_PASSWORD): the Makefile target fills them from .env and pins the
+// migration superuser (postgres/postgres). The superuser login comes from
+// E2E_DB_ADMIN_* when it is set, from DB_USER/DB_PASS otherwise.
 package main
 
 import (
@@ -57,6 +60,15 @@ const (
 // targetNamePattern is the compiled allowlist of the target database name.
 var targetNamePattern = regexp.MustCompile(targetDBPattern)
 
+// protectedDBNames are the cluster databases the tool must never drop, the
+// maintenance database included: dropping it would break every other
+// connection of the cluster.
+var protectedDBNames = map[string]bool{
+	maintenanceDB: true,
+	"template0":   true,
+	"template1":   true,
+}
+
 func main() {
 	if err := run(context.Background(), os.Getenv); err != nil {
 		fmt.Fprintf(os.Stderr, "e2edb: %v\n", err)
@@ -87,14 +99,17 @@ func run(ctx context.Context, getenv func(string) string) error {
 }
 
 // validateTarget enforces the guard rails: an empty name, the application
-// database itself, or a name outside the allowlist is refused before any
-// connection is opened.
+// database itself, a protected cluster database, or a name outside the
+// allowlist is refused before any connection is opened.
 func validateTarget(target, appDB string) error {
 	if target == "" {
 		return errors.New("E2E_DB_NAME is empty: refusing to recreate a database")
 	}
 	if appDB != "" && strings.EqualFold(target, strings.TrimSpace(appDB)) {
 		return fmt.Errorf("E2E_DB_NAME %q is the application database: refusing to drop it", target)
+	}
+	if protectedDBNames[target] {
+		return fmt.Errorf("E2E_DB_NAME %q is a protected cluster database: refusing to drop it", target)
 	}
 	if !targetNamePattern.MatchString(target) {
 		return fmt.Errorf("E2E_DB_NAME %q does not match the allowlist %s", target, targetDBPattern)
@@ -148,6 +163,16 @@ func flushRedis(ctx context.Context, getenv func(string) string) error {
 	return nil
 }
 
+// superuserCredentials returns the login of the migration superuser: the
+// explicit E2E_DB_ADMIN_* variables win, the application DB_USER/DB_PASS are
+// the fallback. Only a superuser can drop and create a database.
+func superuserCredentials(getenv func(string) string) (string, string) {
+	if user := strings.TrimSpace(getenv("E2E_DB_ADMIN_USER")); user != "" {
+		return user, getenv("E2E_DB_ADMIN_PASS")
+	}
+	return strings.TrimSpace(getenv("DB_USER")), getenv("DB_PASS")
+}
+
 // dsn builds the libpq keyword/value connection string of the given
 // database. The values are quoted exactly like the application pools do
 // (internal/db).
@@ -159,11 +184,12 @@ func dsn(getenv func(string) string, database string) string {
 	if getenv("SSL") == "TRUE" {
 		sslMode = "require"
 	}
+	user, pass := superuserCredentials(getenv)
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		quote(getenv("DB_HOST")),
 		quote(getenv("DB_PORT")),
-		quote(getenv("DB_USER")),
-		quote(getenv("DB_PASS")),
+		quote(user),
+		quote(pass),
 		quote(database),
 		sslMode,
 	)

@@ -10,7 +10,7 @@ test("seed the tenant owner", async ({ request }) => {
   const response = await request.post("/v1/user/register", {
     data: {
       name: "Camille Laurent",
-      email: "e2e-owner@atrium.dev",
+      email: "owner@e2e.local",
       password: "e2e-owner-password-0",
       company: "Studio Nord E2E",
     },

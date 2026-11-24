@@ -51,10 +51,12 @@ type AdminAccessDetails struct {
 	AdminID    uuid.UUID
 }
 
-// Token ...
+// Token is the session token pair of a tenant session. RefreshToken is
+// omitted when empty: the unified login reuses this model for its superadmin
+// branch, which carries an access token only (no refresh half).
 type Token struct {
 	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
 }
 
 // AdminToken is the token payload of a superadmin session (no refresh).

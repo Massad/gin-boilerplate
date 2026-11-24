@@ -23,7 +23,7 @@ func TestEphemeralPostgresMigrationsAndFixtures(t *testing.T) {
 	t.Cleanup(pgdb.Close)
 
 	var version int64
-	if err := pgdb.AdminStore().Pool.QueryRow(ctx, "SELECT max(version) FROM goose_db_version").Scan(&version); err != nil {
+	if err := pgdb.AdminStore().Pool.QueryRow(ctx, "SELECT max(version_id) FROM goose_db_version").Scan(&version); err != nil {
 		require.NoError(t, err)
 	}
 	require.GreaterOrEqual(t, version, int64(2), "the migrations must be applied")

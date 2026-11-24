@@ -25,5 +25,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // The Playwright suite lives in app/e2e: vitest must not collect its
+    // specs (the default include would pick app/e2e/login.spec.ts up).
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 })
