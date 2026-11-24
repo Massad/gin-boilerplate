@@ -17,7 +17,7 @@ export default defineConfig({
       // Dev only: the API runs on the Go server; e2e and prod are single-origin
       // (the Go binary serves app/dist).
       "/v1": {
-        target: "http://localhost:9000",
+        target: "http://localhost:9001",
         changeOrigin: true,
       },
     },

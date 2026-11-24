@@ -225,7 +225,7 @@ definitions:
 externalDocs:
   description: OpenAPI
   url: https://swagger.io/resources/open-api/
-host: localhost:9000
+host: localhost:9001
 info:
   contact:
     email: support@swagger.io

@@ -210,7 +210,7 @@ make generate_docs
 make run
 ```
 
-Then open: `https://localhost:9000/swagger/index.html`
+Then open: `https://localhost:9001/swagger/index.html`
 
 The Swagger UI is served only outside `ENV=PRODUCTION`; the generated
 `docs/` spec stays available for tooling.

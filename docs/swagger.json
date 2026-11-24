@@ -15,7 +15,7 @@
         },
         "version": "3.0"
     },
-    "host": "localhost:9000",
+    "host": "localhost:9001",
     "basePath": "/v1",
     "paths": {
         "/admin/login": {

@@ -41,7 +41,7 @@ import (
 // @license.name  MIT License
 // @license.url   https://github.com/Massad/gin-boilerplate/blob/master/LICENSE
 
-// @host      localhost:9000
+// @host      localhost:9001
 // @BasePath  /v1
 
 // @securityDefinitions.apikey BearerAuth
