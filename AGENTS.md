@@ -86,6 +86,14 @@ Règles obligatoires :
 - Schéma DB : migrations goose dans `db/migrations/` (`make migrate_up`) ; PK uuid (`gen_random_uuid()`, PostgreSQL ≥ 13), timestamps `timestamptz`, `updated_at` via trigger `set_updated_at()`
 - Toujours `-mod=readonly` sur les commandes go ; vérifier `go vet` et `make test` avant de terminer
 
+## Plugin EGM (repos sous WSL)
+
+Dès que le repo courant est hébergé sous WSL (workspace vu depuis Windows sous `\\wsl.localhost\Debian\...` ou `\\wsl$\...`, équivalent `/home/sylvaindeb/...` côté Linux), TOUJOURS travailler avec les skills EGM et le plugin chargés depuis le repo `\\wsl.localhost\Debian\home\sylvaindeb\projects\kilo\` — unique source de vérité, jamais recopiés dans le repo courant ni repris depuis un autre emplacement :
+
+- Skills (`skills/<name>/SKILL.md`) : `egm-bootstrap`, `egm-brainstorm`, `egm-draft`, `egm-lite`, `egm-review`, `egm-review-loop`, `egm-resolve`, `egm-drift-report`. Si l'environnement expose le skill (outil `skill`), l'invoquer par son nom ; tous portent `disable-model-invocation: true` — sinon, lire directement le `SKILL.md` du repo kilo et suivre son workflow tel quel
+- `<plugin-root>` = racine du repo kilo (résoudre `${CLAUDE_PLUGIN_ROOT}` ainsi) : personas de review dans `agents/*.md`, règles partagées à lire en premier dans `resources/execution_instructions.md`, standards de documents dans `resources/document_standards/` — passer aux subagents les chemins absolus résolus
+- Toute feature/spec, refactor ou bug fix suit le flux EGM (brainstorm → draft → review → resolve → drift-report) ; `egm-lite` pour les petites itérations rapides — ne pas improviser un flux ad hoc
+
 ## Memory bank
 
 Contexte projet persistant dans `memory-bank/` (`projectbrief`, `productContext`, `systemPatterns`, `techContext`, `activeContext` — à mettre à jour à chaque session —, `progress`).

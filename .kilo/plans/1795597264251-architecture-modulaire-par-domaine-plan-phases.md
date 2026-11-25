@@ -1,0 +1,168 @@
+# Migration incrémentale vers une architecture modulaire par domaine — Plan d'exécution
+
+> Scission du plan original `1795597264251-architecture-modulaire-par-domaine.md` (268 lignes, trop volumineux pour le cycle egm-review) : ce document reprend les lignes 118-259 de l'original (117 et 260 : lignes vides — aucun contenu perdu). Le design (lignes 1-116 + 261-268 : objectif, décisions actées, cartographie, invariants, domaines, couplages, layout cible, questions ouvertes) vit dans [1795597264251-architecture-modulaire-par-domaine-design.md](1795597264251-architecture-modulaire-par-domaine-design.md).
+> Review EGM : egm-review, Step `implementation` — l'en-tête `## Detailed Implementation Plan` ci-dessous fait de tout ce document le DetailedRange (Step 3 → Stage 9 uniquement, pas de paraphrase) ; GoldfishContext = le document de design. Les ancrages de lignes des rapports antérieurs (`zoom_out_report.md`, `goldfish_review_report.md`, racine de `.kilo/plans/`) suivent la numérotation de l'original.
+
+## Detailed Implementation Plan — Feuille de route par phases
+
+### Phase 0 — Filet de sécurité (aucun déplacement de code)
+- **Objet** : corriger la dérive smoke CI, figer la baseline, poser le test contrat d'API, instaurer la discipline de commits (≈ 4 commits).
+- **Risques/Validation** : aucun déplacement de code ; description étape par étape dans « Étapes détaillées — Phases 0-1 » ci-dessous ; CI verte sur la branche.
+
+### Phase 1 — Socle `internal/platform/` + `cmd/api` + `internal/app` (comportement inchangé)
+- **Objet** : 9 `git mv` (config, redisdb, sqlc/pool, mocks, middleware pur, validate) + 1 création (`internal/app` ; `httpx` différé en Phase 2) + mise à jour Makefile/CI/Playwright/AGENTS.md.
+- **Invariants** : **aucun handler ni réponse modifiés** — comportement inchangé au byte près.
+- **Risques/Validation** : description étape par étape dans « Étapes détaillées — Phases 0-1 » ci-dessous ; `make test` + `make e2e` verts en fin de phase.
+
+### Phase 2 — Module pilote `article`
+- **Sources** : `controllers/article.go` → `handler.go` ; `models/article.go` → `service.go` (ArticleService + `ErrNotFound` + mapping ligne→réponse) + `repository.go` (requêtes sqlc via `WithTenant`) ; `forms/article.go` → `dto.go` (form + messages) ; types de réponse → `model.go` ; création de `internal/platform/httpx` en même temps que le module (premier appelant réel — reporté depuis P1.6) : `respond.go` (`AbortMessage`/`JSONMessage`), `pgxerr.go` (`MapPgxError`), `params.go` (`ParseUUIDParam`) + `httpx_test.go` (tests table-driven purs).
+- **Interfaces** (côté service, consommateur) : `type ArticleRepository interface { Create(ctx, tenantID, userID, form) (uuid, error); One(...); All(...); Update(...); Delete(...) }` — implémentée par `repository.go` sur `pgdb.Store` ; constructeur `NewHandler(svc *Service) gin.HandlerFunc`-style, câblé dans `internal/app`.
+- **Tests** : garder la suite `tests/article_test.go` **inchangée** (elle épingle le contrat HTTP via `app.NewRouter` depuis la Phase 1) ; ajouter `internal/modules/article/service_test.go` avec un fake du repository (interface minuscule) : cas `ErrNotFound`→404, update/delete 0 ligne ; `repository_test.go` reste couvert par l'intégration.
+- **Risques** : casse des clés de réponse (`"Message"` majuscule dans certains cas — recopier à l'identique) ; annotations Swagger (regénérer `docs/`) ; `getUserID`/`getTenantID` deviennent des helpers locaux au handler (recopiés depuis `controllers/user.go:19-33`) — pas dans `httpx` : les clés de contexte (`userID`, `tenantID`, `role`) sont posées par `TokenAuth` (module `auth`), qui documente leur contrat ; le platform n'en duplique pas la source de vérité.
+- **Validation** : suite `tests/` verte sans modification des assertions (preuve de non-régression), `make generate_docs` diff = déplacement d'annotations uniquement.
+
+### Phase 3 — Module `auth` (primitives sessions/JWT + middlewares)
+- **Sources** : `models/auth.go` → `service.go` (TokenService : CreateToken/CreateAuth/Extract/Fetch/Delete/ConsumeRefreshAuth + variantes admin) + `repository.go` (sessions Redis : clés, index `user_sessions:*`, préfixe `admin:`, script Lua) + `model.go` (TokenDetails/AccessDetails/Admin*) ; `middleware/auth.go` → `middleware.go` du module (TokenAuth/AdminAuth/RequirePermission prennent `*auth.Service` en paramètre) ; `controllers/user.go` Logout et `controllers/admin.go` Logout/Login → migrés dans `handler.go` du module (logout user 200 « Successfully logged out », admin idem).
+- **Soft-consume strict du refresh token (décision actée 2026-11-25, design décision 7 — politique fixée dans le design)** : la consommation (`ConsumeRefreshAuth`, script Lua/repository du module) ne supprime plus immédiatement — record de session = **chaîne STRING existante** adressée par l'UUID du refresh JWT (`user_sessions:{userID}` = index SET de révocation, pas le record ; **aucune migration de schéma**, format actif inchangé « userID:tenantID:role ») ; état encodé dans la valeur : consommé `consumed:<delivered|recovered>:<value>` ; TTL réduit à la grâce **5 min** (min(grâce, TTL restant)) au lieu de DEL ; atomicité Lua et ownership inchangés (préfixe userID comparé avant consommation — `TestRefreshOnlyConsumesMatchingOwner` déplacé avec le module). **Politique de rejeu (fixée dans le design)** : rejeu d'un jeton déjà délivré (`delivered`) → `401` (même forme de réponse que le chemin invalide actuel) ; rejeu d'un jeton consommé non délivré pendant la grâce → **une seule** re-émission de récupération (état `recovered` encodé dans la valeur, jamais dans la réponse HTTP ; sinon `401`) ; crash serveur entre consommation et lecture → échec fermé. **Rollout/rollback** : records actifs au format inchangé (binaire pré-Phase-3 compatible) ; seuls les records consommés (≤ 5 min) portent le format étendu — rollback pré-Phase-3 borné aux consommations en grâce (re-login équivalent à une consommation normale). Éviction TTL primaire ; sweep in-process du module (ticker ~5 min) d'observabilité + purge défensive des reliques (invariant de course écrit dans le design). Tests dédiés exigés : rejeu / grâce / recovery / fails-closed / sweep / unicité de la recovery. L'incident de session reste observable côté support (journalisé au marquage et à la récupération). **Carve-out de contrat assumé** : seul le chemin « rejeu pendant grâce » peut différer du comportement actuel — happy path et rejeu après délivrance restent inchangés au byte près (cf. Risques transverses).
+- **Transition** : les consommateurs racine non migrés (`models/user.go` Login, `models/login.go`, `controllers/user.go` Login/Register, `controllers/admin.go`) reçoivent le `*auth.Service` par injection (internal/app construit) ; `middleware/` vidé de `auth.go` (CORS/RequestID partis en Phase 1) → dossier supprimé si vide, sinon gardé pour les résidus.
+- **Tolérance transitoire (Phases 3-6, décision A2 — tolérance transitoire explicite ; définition complète et impact : §4 du design)** : pendant la fenêtre, les imports racine↔`internal/modules/*` sont tolérés **dans les deux sens**, uniquement pour le code en cours de migration (les handlers `auth` migrent en Phase 3 et consomment `models.AdminModel`/`UserModel` ; les consommateurs racine consomment `*auth.Service`). La fenêtre se referme en Phase 7 (suppression des répertoires racine) ; l'interdiction est vérifiée par le critère de sortie (décompte `git ls-files` — voir Critères de sortie). Invariants absolus pendant toute la fenêtre : `internal/platform/*` et `cmd/e2edb` n'importent jamais `internal/modules/*`.
+- **Interfaces** : le **port `TokenService` est défini côté consommateur** — `user`/`admin` (Phases 5-6) déclarent l'interface dont ils ont besoin et reçoivent l'implémentation d'`auth` injectée dans `internal/app` ; la Phase 3 livre le service concret `*auth.Service` (constructeur `NewService`, repository sessions inclus) + `auth.Service` consommé par les middlewares. Ports **définis ici** (Phase 3), implémentés par `user`/`admin` (Phases 5-6), injectés dans `internal/app` en Phase 7 : `UserAuthenticator`, `AdminAuthenticator`, `UserReader` (`OneWithTenant` — relecture user pour Refresh : rôle re-fraîchi depuis la base à chaque émission).
+- **Risques** : sémantique du script Lua (ownership) — couverte par `TestRefreshOnlyConsumesMatchingOwner` (le déplacer au module) ; secrets lus via `os.Getenv` dans le service — injecter un `Secrets` struct au constructeur (DI explicite, testable `t.Setenv`→variables) ; middlewares deviennent des constructeurs paramétrés (`TokenAuth(svc)`) → routes mises à jour uniquement dans `internal/app` + `tests/` (via app.NewRouter, rien à changer).
+- **Validation** : `middleware/auth_test.go` migré vers le module (7 tests), suite `tests/` verte.
+
+### Phase 4 — Module `tenant`
+- **Sources** : `models/tenant.go` → `service.go` (Slugify/ValidSlug — tests purs déplacés de `models/tenant_test.go` — résolution de slug par tentatives `createTenantInTx`), `repository.go` (CreateTenant/ListTenants/UpdateTenantStatus sur pool admin), `model.go` (Tenant, TenantPayload, AllTenantResponse).
+- **Interfaces** : `TenantProvisioner` — **défini côté consommateur** (`user` le déclare pour son register, `admin` pour le backoffice ; implémenté par le module tenant), opérations in-Tx : `CreateInTx(ctx, tx pgdb.InTx, name) (Tenant, error)` où `pgdb.InTx` est l'interface plateforme étroite (`*pgdb.Queries` ne franchit pas la frontière de module — design décision 6 ; orchestration par `pgdb.WithinTx`) ; `TenantReader` (List/UpdateStatus) défini côté consommateur `admin`.
+- **Risques** : boucle de collision slug (`23505`, max 99 tentatives) — tests purs à déplacer ; l'échec d'épuisement des 99 tentatives garde le contrat actuel épinglé pendant la migration (erreur discriminée + code HTTP spécifiés post-migration dans le `service_test.go` pur) ; `reservedSlugs` contient des racines de routes — test contrat (mécanique `TestAPISurface`, P0.3) qui échoue si une racine de route réelle manque dans la liste, plus commentaire de rappel à la maintenance.
+- **Validation** : tests purs verts, suite `tests/` verte (register + admin tenants l'exercent de bout en bout).
+
+### Phase 5 — Module `user`
+- **Sources** : `models/user.go` → `service.go` (Login — relecture plateforme + bcrypt + tenant status avant password ; Register — orchestre la Tx : `TenantProvisioner.CreateInTx` + `CreateUserOwner`) + `repository.go` (GetUserForLogin/GetUserWithTenant/GetUserByID/CreateUserOwner, pool admin ; GetUserByID via WithTenant) ; `controllers/user.go` (Login/Register) → `handler.go` ; `forms/user.go` → `dto.go` ; types User/UserLoginResponse → `model.go`.
+- **Interfaces** : déclare et consomme son port `TokenService` (login émet les tokens — implémentation fournie par auth, injectée à l'app) ; déclare le port `TenantProvisioner` (register : `pgdb.WithinTx` pilote la Tx, décision 6) ; **implémente `UserAuthenticator` et `UserReader`** (ports définis dans `auth`, Phase 3).
+- **Risques** : l'erreur Register « email already exists » dépend de `pgx.ErrNoRows` sur l'insert (`models/user.go:122`) — la conserver ; `ErrTenantSuspended` 403 avant comparaison mot de passe (ordre actuel : lecture user d'abord, puis status, puis bcrypt — conserver exactement).
+- **Validation** : `tests/article_test.go` (register/login en tête de suite) + `tests/login_test.go` verts inchangés.
+
+### Phase 6 — Module `admin`
+- **Sources** : `models/admin.go` + `controllers/admin.go` → `handler.go` (Login/Tenants/SetTenantStatus/Logout), `service.go` (vérification credentials bcrypt, SetTenantStatus + audit **dans la même Tx** — `models/admin.go:55-64`), `repository.go` (GetAdminByEmail/CreateAdmin/InsertAdminAudit/ListTenants/UpdateTenantStatus) ; `forms/admin.go` → `dto.go`.
+- **Interfaces** : déclare et consomme son port `TokenService` (tokens admin — implémentation fournie par auth), le port `TenantReader` (List/UpdateStatus — implémenté par tenant) ; implémente `AdminAuthenticator` (port défini dans `auth`, Phase 3).
+- **Risques** : l'audit doit rester dans la même Tx que le changement de statut ; le CLI `-create-admin` (cmd/api) utilise `AdminModel.Create` → passe au service admin (upsert idempotent — couvert par `main_test.go`).
+- **Validation** : suite admin (`TestAdminLogin`, `TestAdminSuspendTenant`, audit implicite) + `cmd/api/main_test.go` verts.
+
+### Phase 7 — Module `auth` : collage final (le plus complexe, en dernier)
+- **Sources restantes** : `controllers/auth.go` → `auth/handler.go` : **Refresh** (toute la logique descend dans le service : parse refresh JWT, `ConsumeRefreshAuth`, relecture user via port, contrôle status, ré-émission — le handler ne garde que bind/réponse) et **Login unifié** (`models/login.go` → `auth/service.go` : orchestration UserAuthenticator → fallback AdminAuthenticator + bcrypt factice + `DummyHashComparisons`) ; `forms/auth.go` (Token) → `dto.go`.
+- **Ports** : `UserAuthenticator` (`Login(form) (User, TenantPayload, Token, error)`), `AdminAuthenticator` (`Login(email, password) (AdminIdentity, error)`) et `UserReader` (relecture user pour Refresh : rôle re-fraîchi depuis la base) sont **définis dans `auth` depuis la Phase 3** ; `user`/`admin` les implémentent (Phases 5-6) ; la Phase 7 fait le collage final : injection dans `internal/app` (aucun cycle : auth ne connaît que ses interfaces).
+- **Suppressions de la phase** : `controllers/`, `models/`, `forms/`, `middleware/` vides → suppression des répertoires ; `tests/` ne référence plus que `internal/app` + `internal/platform/*`.
+- **Risques** : réponses à coût constant (406 générique, une seule tentative bcrypt, jamais les deux annuaires sondés — user puis admin) — matrice `tests/login_test.go` l'épingle ; conserver le 403 suspendu ; champ `kind` de la réponse unifiée (`tenant_user` | `superadmin` — discriminateur consommé par la SPA) et omission de `refresh_token` côté superadmin ; déplacement mécanique du hook d'observabilité `DummyHashComparisons` (`models/login.go:34-38`, consommé par `tests/login_test.go`) vers le module `auth`.
+- **Validation** : `make test` complet + `make e2e` (parcours UI réels) verts.
+
+### Phase 8 — Nettoyage et règles projet
+- Déplacer `invoice/` → `internal/modules/invoice/` (décision B10 actée : paquet pur, sans route ni DB, aucun appelant applicatif ; tests poppler inchangés, commande documentée `go test -mod=readonly -count=1 -race -v ./internal/modules/invoice`) ; supprimer les artefacts racine (`gin-boilerplate`, `e2edb.exe`, `tmp_line.txt`) ; traiter la suppression non commitée `docs/test.md`.
+- **Sortie de dette tracée — `binding.Validator` (backlog explicite, directive 2026-11-25)** : déplacer l'affectation globale `binding.Validator` hors de `NewRouter` (`internal/app`) vers l'entrypoint (`cmd/api`) ou `internal/platform/validate` — dette remontée au niveau design (§3.9, réserve (c)) consignée en P1.7(a) ; élimination requise à la sortie de migration.
+- Réécrire les conventions : `AGENTS.md` (structure, commandes `go run ./cmd/api`, conventions « ajouter une ressource » au format module, chemins sqlc/mocks), `README.md` (arborescence), `memory-bank/` (`systemPatterns`, `techContext`, `activeContext`, `progress`).
+- **Note factuelle** : ce dépôt n'a pas de répertoire `.kilocode/rules/` ; les règles projet vivent dans `AGENTS.md` (et `.kilo/`). La mise à jour des règles cible donc `AGENTS.md`.
+- Ajouter un garde CI optionnel : interdire les nouveaux imports de `controllers|models|forms|middleware` racine (`! git grep ...` comme les garde-fous existants) pour empêcher la régression.
+
+### Risques transverses et rollback
+
+- **Régression du contrat HTTP/SPA** : couverte par le test contrat P0.3, les assertions `tests/` inchangées, le smoke CI à chaque branche et `make e2e` aux Phases 1 et 7 ; aucune phase ne modifie un handler sans que la suite `tests/` repasse. **Unique carve-out acté** : le soft-consume du refresh (Phase 3) modifie le comportement du chemin de rejeu pendant la grâce — un jeton non délivré retrouvé pendant la grâce bénéficie de la recovery unique (nouveau chemin, tests dédiés dans le module `auth`) ; le rejeu après délivrance et le happy path restent inchangés au byte près, assertions existantes inchangées.
+- **Fenêtre de câblage intermédiaire** : chaque étape laisse `go build` + `go vet` verts ; la fenêtre transitoire racine↔modules (Phases 3-6, décision A2 — tolérance transitoire explicite, cf. design §4) est actée et vérifiée par le critère de sortie (décompte `git ls-files`).
+- **Rollback** : une branche par phase, merge uniquement si CI verte ; en cas d'échec en cours de phase (build rouge entre deux commits), revert jusqu'au dernier commit vert puis re-diagnostic — pas de commit correctif en avance.
+- **Charge de tests** : chaque phase module embarque une suite `service_test.go` pur (critère de sortie) ; l'extension se borne aux comportements non couverts par la suite HTTP existante.
+
+---
+
+## Étapes détaillées — Phase 0 et Phase 1 uniquement
+
+> Discipline commune : une branche par phase ; un commit par étape ; **jamais mélanger un `git mv` et une édition de contenu dans le même commit** ; `go build -mod=readonly ./...` + `go vet -mod=readonly ./...` après chaque étape ; `make test` complet à la fin de chaque phase ; ne jamais lancer `make test`/`make e2e`/`go test` en parallèle dans le même checkout (convention AGENTS.md « Risques »). Les numéros de ligne (`main.go:16`, `models/auth.go:11`, etc.) décrivent l'état initial du dépôt — ils deviennent obsolètes dès la première étape validée ; la liste des fichiers fait foi, la compilation verte est le vrai contrôle.
+
+### Phase 0 — Filet de sécurité (≈ 4 commits)
+
+**P0.1 — Corriger la dérive smoke CI (bug préexistant, à corrifier avant tout refactoring)**
+- `.github/workflows/ci.yml` : retirer `/v1/invoice` et `/v1/invoice/download` de la liste du smoke step (ligne 139) et leurs fragments (`"/v1/invoice": b"INV-001"` ligne 157 ; bloc PDF lignes 166-168). Les routes ont été supprimées de `main.go` (plan 1795284300000-remove-public-access.md) : le smoke attend 200/PDF là où le serveur renvoie 404 JSON → le smoke step entre en conflit avec `main.go` actuel — échec au prochain run.
+- Vérification : lecture croisée `main.go:148-182` ↔ liste smoke (les 14 routes API + `/`, `/swagger/*`).
+
+**P0.2 — Figer la baseline**
+- Prérequis : `make services_up` **puis `make migrate_up`** — le paquet `internal/db/pool_test.go` se connecte réellement à la base configurée (convention AGENTS.md) ; un checkout frais échoue sans cette migration initiale.
+- Build et vet, verts exigés :
+  - `go build -mod=readonly ./...`
+  - `go vet -mod=readonly ./...`
+- Tests : `make test` (provisionne `artisan_test`, tag `all` complet, `-race` en CI) — vert exigé.
+- Régénération idempotente (diff git vide sinon : committer la régénération **avant** de commencer) :
+  - `make generate_sqlc` → `git diff --exit-code` sur `internal/db`.
+  - `make generate_mocks` → diff vide.
+  - `make generate_docs` → `docs/` inchangé.
+- Consigner les résultats (ex. `memory-bank/progress.md`, une ligne).
+
+**P0.3 — Test contrat d'API (filet anti-perte de route)**
+- Nouveau fichier `tests/api_surface_test.go` (tag `all`) : lit `docs/swagger.json` (généré, commité), extrait l'ensemble `{(méthode, chemin)}` (préfixe `/v1` uniforme, paramètres normalisés `{id}`) et le compare par **égalité bidirectionnelle** (exacte) à la liste attendue figée : `POST /v1/user/login`, `POST /v1/user/register`, `GET /v1/user/logout`, `POST /v1/login`, `POST /v1/token/refresh`, `POST /v1/article`, `GET /v1/articles`, `GET/PUT/DELETE /v1/article/{id}`, `POST /v1/admin/login`, `GET /v1/admin/logout`, `GET /v1/admin/tenants`, `POST /v1/admin/tenants/{id}/status`. Toute route disparue **ou ajoutée** échoue le test.
+- Ce test survit à tous les déplacements (les annotations suivent les handlers). Le fichier lit le JSON commité et ne fait aucune requête applicative ; l'exécution passe par le `TestMain` du paquet `tests`, qui exige PostgreSQL actif et la base `artisan_test` provisionnée.
+- Exécuter : `go test -mod=readonly -count=1 -tags=all ./tests/ -run TestAPISurface` (base `artisan_test` déjà provisionnée).
+
+**P0.4 — Discipline**
+- Une branche `refactor/modular-phase-N` par phase ; merge uniquement si CI verte (build, vet, sqlc-diff, smoke corrigé, tests `-race -tags=all`).
+
+### Phase 1 — Socle platform + `cmd/api` + `internal/app` (≈ 6 commits)
+
+**P1.1 — `internal/platform/config`**
+- `git mv config internal/platform/config` (package `config` inchangé). MAJ import : `main.go:16`. Suivent : `config/secrets_test.go` (déplacé avec le paquet).
+- Vert : `go build -mod=readonly ./... && go vet -mod=readonly ./... && go test -mod=readonly -count=1 ./internal/platform/config/`.
+
+**P1.2 — `internal/platform/redisdb`**
+- `git mv db/db.go internal/platform/redisdb/redis.go` + `git mv db/db_test.go internal/platform/redisdb/redis_test.go` ; renommer le package `db` → `redisdb` ; **garder** les noms exportés `InitRedis`/`GetRedis`/`RedisDBIndex`/`DefaultRedisDB` (la garde CI `! git grep "InitRedis(1)"` reste signifiante). Les qualificateurs `db.` deviennent `redisdb.` aux 7 sites (ex. `db.InitRedis()` `main.go:144` → `redisdb.InitRedis()`) ; l'import de `main.go:18` passe à `internal/platform/redisdb` sans alias (le nom de package suffit ; l'import aliasé `pgdb` de `main.go:21` bouge lui en P1.3). `db/` ne garde plus que `migrations/` + `queries/` (sources SQL).
+- MAJ imports (7 fichiers) : `main.go:18`, `models/auth.go:11`, `cmd/e2edb/main.go:45`, `tests/article_test.go:20`, `tests/login_test.go:18`, `controllers/auth_test.go:15`, `middleware/auth_test.go:12`.
+- Vert : `go build -mod=readonly ./... && go vet -mod=readonly ./...` + tests du paquet (`RedisDBIndex`, rejets hors plage — `db_test.go` déplacé) + `go test -mod=readonly -count=1 ./cmd/e2edb/`.
+
+**P1.3 — `internal/platform/db` (code généré + pool)**
+- `sqlc.yaml:9` : `out: internal/platform/db` (package `db` inchangé, alias `pgdb` conservé partout). `git mv internal/db internal/platform/db` ; `git mv internal/mocks internal/platform/mocks`.
+- `.mockery.yaml:9` : chemin du paquet → `github.com/Massad/gin-boilerplate/internal/platform/db` (le `dir: "{{.InterfaceDir}}/../mocks"` régénère alors dans `internal/platform/mocks`).
+- MAJ imports (11 fichiers + mocks générés — dont `internal/platform/mocks/mock_Querier.go`) : `main.go:21`, `main_test.go:10`, `models/{article,user,tenant,admin}.go`, `internal/testutil/{fixtures.go,postgres_test.go}`, `tests/article_test.go:22`, `tests/login_test.go:20`, `controllers/auth_test.go:16`, `internal/platform/mocks/mock_Querier.go` ; commentaire `cmd/e2edb/main.go:200` mis à jour (« (internal/db) » → « (internal/platform/db) »).
+- `.github/workflows/ci.yml:88` : `git diff --exit-code internal/db` → `internal/platform/db`.
+- Exécuter `make generate_sqlc` (doit être un no-op diff sur `internal/platform/db`) et `make generate_mocks` (mocks identiques au nouveau chemin).
+- Vert : `go build -mod=readonly ./...` + `go vet -mod=readonly ./...` + `go test -mod=readonly -count=1 ./internal/platform/db/` (pool_test) + suite `all` plus tard.
+
+**P1.4 — `internal/platform/middleware` (partie pure)**
+- `git mv middleware/cors.go middleware/request_id.go internal/platform/middleware/` (package `middleware` ; le répertoire `middleware/` garde `auth.go` + tests jusqu'à la Phase 3).
+- MAJ imports : `main.go:22` (temporairement deux paquets middleware : `platformmw` + `middleware` — disparaît en Phase 3 via `internal/app`).
+- Vert : `go build -mod=readonly ./...` + `go vet -mod=readonly ./...` (paquet pur sans test dédié ; comportement inchangé).
+
+**P1.5 — `internal/platform/validate`**
+- `git mv forms/validator.go forms/errors.go internal/platform/validate/` ; package `validate` ; exportés inchangés (`DefaultValidator`, `Translate`, `ValidationMessages`, `DefaultMessage`). `forms/` garde uniquement les forms/messages par domaine et importe `validate.ValidationMessages`.
+- MAJ sites appelants `forms.Translate` (→ `validate.Translate`) : `controllers/{auth,user,article,admin}.go`, `tests/` si usage direct ; site cassant réel côté testutil : `internal/testutil/factory_test.go:86` (`binding.Validator = new(forms.DefaultValidator)` → `validate.DefaultValidator`) — `internal/testutil/factory.go` n'est **pas** touché (il n'utilise que les structs de `forms`, qui restent en place) ; l'import `forms` de `main.go:20` disparaît (seul usage : l.130, remplacé par `validate`).
+- Le branchement global `binding.Validator = new(forms.DefaultValidator)` (main.go:130, tests/article_test.go:39) passera à `validate.DefaultValidator` — même comportement (tag `binding`, règle `fullName`).
+- Vert : `go build -mod=readonly ./...` + `go vet -mod=readonly ./...` + `go test -mod=readonly -count=1 ./internal/platform/validate/`.
+
+**P1.6 — `internal/platform/httpx` (création différée en Phase 2)**
+- Reporté : le paquet sera créé en Phase 2, au moment de la première adoption réelle (handlers article) — pas de code mort sans appelant pendant la migration. Contenu visé : `respond.go` (`AbortMessage(c, status, msg)` / `JSONMessage` — même forme `gin.H{"message": ...}`), `pgxerr.go` (`MapPgxError` : `ErrNoRows`→404, `23505`→409, `23503`→409, `42501`→500 — conforme AGENTS.md), `params.go` (`ParseUUIDParam(c, name)`), + `httpx_test.go` (tests table-driven purs — mapping, parse).
+- Pas de `identity.go` : les accesseurs `getUserID`/`getTenantID`/`getRole` restent locaux aux handlers consommateurs (recopiés depuis `controllers/user.go:19-33`) — les clés de contexte (`userID`, `tenantID`, `role`) sont posées par `TokenAuth` (module `auth`), qui documente leur contrat ; le platform n'en duplique pas la source de vérité.
+
+**P1.7 — `internal/app` + `cmd/api`**
+- Créer `internal/app/router.go` : `type Deps struct{ TemplateGlob string; Env string }` (figé à ces deux champs) ; `func NewRouter(deps Deps) *gin.Engine` recopiant **à l'identique** `main.go:127-134` — `gin.Default()` (l.127), `SetTrustedProxies(nil)` (l.128), `binding.Validator` (l.130), CORS/RequestID (l.132-133), `gzip.Gzip(gzip.DefaultCompression)` (l.134) — puis `main.go:148-212` (routes `/v1` avec `middleware.TokenAuth()`/`AdminAuth()`, Swagger hors prod, `LoadHTMLGlob`, `/public`, `/assets` immutable, `serveSPAIndex`, `NoRoute`). L'init pools/Redis (`main.go:136-146`) reste dans `cmd/api` ; les handlers restent les anciens controllers (zéro comportement changé).
+- Dettes consignées : (a) `NewRouter` recopie l'affectation globale `binding.Validator` (main.go:130) — acceptable en transitionnel, à déplacer vers l'entrypoint/`platform/validate` en sortie de migration ; (b) la recopie du câblage crée une surface Δ avec `main.go` — couverte par le test d'équivalence ci-dessous.
+- Test d'équivalence en fin d'étape : diff structurale entre l'ancien routeur et `app.NewRouter` — `gin.Routes()` (méthode, chemin, nom du handler) + liste des middlewares — vide attendu.
+- `git mv main.go cmd/api/main.go` : garde dotenv, flags, `runCreateAdmin` (main.go:56-77), `ValidateSigningSecrets`, init pools/redis, `defer pgdb.Close()` ; construit `app.Deps` et lance. `git mv main_test.go cmd/api/main_test.go` (contenu inchangé, tag `all`).
+- `tests/article_test.go` : remplacer `SetupRouter` (lignes 34-80) par `app.NewRouter(app.Deps{TemplateGlob: "../public/html/*", Env: os.Getenv("ENV")})` — la duplication des routes disparaît, la suite épingle désormais le vrai câblage. `controllers/auth_test.go` et `middleware/auth_test.go` construisent des routers minimaux dédiés (inchangés).
+- `main.go` racine supprimé → module sans paquet racine : vérifier qu'aucun script n'utilise `go run .` (étape P1.8).
+
+**P1.8 — Orchestration, docs et conventions (même commit que P1.7)**
+- `Makefile:50` : `@go run ./cmd/api` ; `Makefile:168` : `go run -mod=readonly ./cmd/api -create-admin ...` ; `Makefile:88` (generate_docs) : `swag init -g cmd/api/main.go`.
+- `.github/workflows/ci.yml:83` : `go build -mod=readonly -o /tmp/gin-boilerplate ./cmd/api` (le smoke garde cwd = racine : `./app/dist/index.html`, `./public/html/*` et `./cert/*` résolvent encore).
+- `app/playwright.config.ts:51` : `command: "go run ./cmd/api"` (cwd `".."` inchangé).
+- `make generate_docs` → committer `docs/` (annotations déplacées ; jeu de routes identique — le test P0.3 le vérifie).
+- `AGENTS.md` + `memory-bank/activeContext.md` + `progress.md` : chemins et commandes mis à jour (convention du dépôt).
+
+**Validation finale Phase 1 (toute la batterie)**
+1. `go build -mod=readonly ./...` et `go vet -mod=readonly ./...` verts.
+2. `make generate_sqlc` → `git diff --exit-code internal/platform/db` ; `make generate_mocks` → diff vide ; `make generate_docs` → diff vide.
+3. `make test` complet (tag `all`) vert — en particulier `TestAPISurface` (P0.3), la suite `tests/` (maintenant via `app.NewRouter`), `TestRunCreateAdmin` (dans `cmd/api`), les 7 tests middleware.
+4. `make e2e` **une fois** (le webServer a changé de commande) — cycle complet Playwright vert.
+5. CI verte sur la branche (smoke corrigé en P0.1 inclus).
+
+## Critères de sortie de chaque phase (règles invariables)
+
+- `go build -mod=readonly ./...`, `go vet -mod=readonly ./...`, `make test` verts ; Phase 1 et 7 : `make e2e` vert en plus.
+- Contrat HTTP inchangé : le test `tests/api_surface_test.go` vert **sans éditer la liste attendue** ; les assertions de `tests/` non modifiées (sauf déplacement mécanique de helpers).
+- **Charge de tests par phase module** : chaque phase embarque les tests du domaine déplacé (unitaires pur suivent le code : `models/tenant_test.go` → Phase 4, `middleware/auth_test.go` + `controllers/auth_test.go` → Phase 3) **et** au minimum une suite `service_test.go` pur par module avec un fake du repository (sans PostgreSQL/Redis) couvrant les erreurs discriminées du domaine (p.ex. Phase 2 : `ErrNotFound`→404 et 0-ligne update/delete ; Phase 5 : email dupliqué (`ErrNoRows` sur insert) + slug réservé/épuisé ; Phase 6 : audit écrit dans la même Tx que le statut — testée par fake en vérifiant l'ordre des appels). Aucune phase ne baisse la couverture.
+- **Conventions d'environnement de test préservées** : tout nouveau paquet de test d'intégration porte son `TestMain` épinglant `REDIS_DB=2` + `DB_NAME=artisan_test` ; index Redis 1/2/3 inchangés (dev/suites Go/e2e) ; garde CI « fuite helpers » (`internal/testutil` jamais importé hors `*_test.go`) et `InitRedis(1)` interdit ; secrets de test uniquement via `t.Setenv`.
+- Régénération idempotente : sqlc, mocks, swagger → diffs vides après régénération.
+- **Fenêtre transitoire et compteur de fichiers legacy (décision A2 — tolérance transitoire explicite ; définition complète et impact : §4 du design)** : pendant les Phases 3-6, les imports racine↔`internal/modules/*` sont tolérés **dans les deux sens** pour le code en cours de migration (fenêtre actée — voir Phase 3). À partir de la Phase 7 : décompte réel des fichiers sous `controllers/`, `models/`, `forms/`, `middleware/` via `git ls-files` — décroissant à chaque sortie de phase, **0 en sortie de Phase 7** (répertoires supprimés). Invariants absolus pendant toute la migration : `internal/platform/*` et `cmd/e2edb` n'importent jamais `internal/modules/*`.
+- AGENTS.md et memory-bank mis à jour dans la foulée de chaque phase (convention dépôt).
