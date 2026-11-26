@@ -14,6 +14,7 @@ import (
 	"github.com/Massad/gin-boilerplate/internal/app"
 	"github.com/Massad/gin-boilerplate/internal/platform/config"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
@@ -98,7 +99,15 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := app.NewRouter(app.Deps{TemplateGlob: "./public/html/*", Env: os.Getenv("ENV")})
+	r := app.NewRouter(app.Deps{
+		TemplateGlob: "./public/html/*",
+		Env:          os.Getenv("ENV"),
+		Secrets: auth.Secrets{
+			Access:      os.Getenv("ACCESS_SECRET"),
+			Refresh:     os.Getenv("REFRESH_SECRET"),
+			AdminAccess: os.Getenv("ADMIN_ACCESS_SECRET"),
+		},
+	})
 
 	ctx := context.Background()
 	if err := pgdb.InitTenant(ctx, os.Getenv); err != nil {

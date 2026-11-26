@@ -1,6 +1,6 @@
 //go:build all
 
-package controllers
+package auth_test
 
 import (
 	"bytes"
@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Massad/gin-boilerplate/controllers"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
@@ -21,15 +23,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestRefreshOnlyConsumesMatchingOwner exercises the adapted Lua script and the
-// platform pool re-verification of the refresh flow: ownership check on the
-// Redis value, fresh role from the database, suspended tenant rejection.
+// TestRefreshOnlyConsumesMatchingOwner exercises the soft-consume Lua script
+// and the platform pool re-verification of the refresh flow: ownership check
+// on the Redis value, fresh role from the database, suspended tenant
+// rejection. With the soft-consume (decision 7) the record is never deleted by
+// a consumption: it stays until its TTL — reduced to the grace at the
+// consumption — evicts it, so every case leaves the record in place.
 func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	if os.Getenv("REDIS_HOST") == "" || os.Getenv("DB_HOST") == "" {
 		t.Skip("set REDIS_HOST and DB_HOST to isolated services")
 	}
 	t.Setenv("ACCESS_SECRET", "access-key-for-isolated-tests-only-32-bytes")
 	t.Setenv("REFRESH_SECRET", "refresh-key-for-isolated-tests-only-32-bytes")
+	t.Setenv("ADMIN_ACCESS_SECRET", "admin-key-for-isolated-tests-only-32-byt")
 	gin.SetMode(gin.TestMode)
 	require.NoError(t, redisdb.InitRedis(), "resolving the Redis database index")
 	require.Equal(t, 2, redisdb.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
@@ -40,6 +46,14 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	var suiteDB string
 	require.NoError(t, pgdb.AdminStore().Pool.QueryRow(context.Background(), "SELECT current_database()").Scan(&suiteDB))
 	require.Equal(t, "artisan_test", suiteDB, "the suite must run on the disposable database artisan_test")
+	svc := auth.NewService(
+		auth.Secrets{
+			Access:      os.Getenv("ACCESS_SECRET"),
+			Refresh:     os.Getenv("REFRESH_SECRET"),
+			AdminAccess: os.Getenv("ADMIN_ACCESS_SECRET"),
+		},
+		auth.NewRepository(redisdb.GetRedis()),
+	)
 
 	// Seed a tenant and its owner on the platform pool, from the seeded
 	// factories (unique slug and email per test name).
@@ -61,7 +75,7 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	require.NoError(t, err)
 
 	r := gin.New()
-	r.POST("/refresh", new(AuthController).Refresh)
+	r.POST("/refresh", controllers.NewAuthController(svc).Refresh)
 
 	// seedRefresh inserts the redis value and signs a refresh token claiming
 	// the given owner.
@@ -112,11 +126,11 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 			require.Equal(t, tc.wantStatus, w.Code, "refresh status mismatch")
 			remaining, err := redisdb.GetRedis().Exists(id).Result()
 			require.NoError(t, err)
-			wantRemaining := int64(0)
-			if tc.name == "owner mismatch" {
-				wantRemaining = 1
-			}
-			require.Equal(t, wantRemaining, remaining, "remaining refresh key mismatch")
+			// The soft-consume never deletes the record on a consumption:
+			// the owner mismatch leaves it untouched, the suspended and
+			// matching flows leave a consumed record released for the
+			// former, delivered for the latter, until the TTL evicts it.
+			require.Equal(t, int64(1), remaining, "remaining refresh key mismatch")
 			if w.Code == http.StatusOK {
 				var result struct {
 					AccessToken  string `json:"access_token"`

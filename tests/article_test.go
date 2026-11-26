@@ -18,6 +18,7 @@ import (
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/app"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/Massad/gin-boilerplate/internal/modules/article"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
@@ -34,7 +35,15 @@ import (
 // real app.NewRouter wiring, with the suite's template glob and test mode.
 func testRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	return app.NewRouter(app.Deps{TemplateGlob: "../public/html/*", Env: os.Getenv("ENV")})
+	return app.NewRouter(app.Deps{
+		TemplateGlob: "../public/html/*",
+		Env:          os.Getenv("ENV"),
+		Secrets: auth.Secrets{
+			Access:      os.Getenv("ACCESS_SECRET"),
+			Refresh:     os.Getenv("REFRESH_SECRET"),
+			AdminAccess: os.Getenv("ADMIN_ACCESS_SECRET"),
+		},
+	})
 }
 
 // doRequest runs one request against the router and returns the recorder.

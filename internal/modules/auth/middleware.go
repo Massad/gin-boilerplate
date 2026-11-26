@@ -1,13 +1,10 @@
-package middleware
+package auth
 
 import (
 	"net/http"
 
-	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
 )
-
-var authModel = new(models.AuthModel)
 
 // Permissions of the minimal RBAC layer: owner-only routes opt into them later.
 const (
@@ -32,17 +29,18 @@ func hasPermission(role, permission string) bool {
 }
 
 // TokenAuth validates the JWT access token, resolves the session in Redis and
-// exposes userID, tenantID and role to the handler chain. An admin token is
-// rejected: it is signed with a different secret and has no tenant claims.
-func TokenAuth() gin.HandlerFunc {
+// exposes userID, tenantID and role to the handler chain (context keys
+// "userID", "tenantID", "role"). An admin token is rejected: it is signed with
+// a different secret and has no tenant claims.
+func TokenAuth(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		details, err := authModel.ExtractTokenMetadata(c.Request)
+		details, err := svc.ExtractTokenMetadata(c.Request)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Please login first"})
 			return
 		}
 
-		userID, err := authModel.FetchAuth(details)
+		userID, err := svc.FetchAuth(details)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Please login first"})
 			return
@@ -69,15 +67,16 @@ func RequirePermission(permission string) gin.HandlerFunc {
 
 // AdminAuth validates the superadmin access token, signed with the dedicated
 // secret and stored under the admin: Redis prefix: a tenant token cannot pass.
-func AdminAuth() gin.HandlerFunc {
+// The resolved identity is exposed under the context key "adminID".
+func AdminAuth(svc *Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		details, err := authModel.ExtractAdminTokenMetadata(c.Request)
+		details, err := svc.ExtractAdminTokenMetadata(c.Request)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Admin authentication required"})
 			return
 		}
 
-		adminID, err := authModel.FetchAdmin(details)
+		adminID, err := svc.FetchAdmin(details)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Admin authentication required"})
 			return

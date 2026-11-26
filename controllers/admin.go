@@ -3,6 +3,8 @@ package controllers
 import (
 	"net/http"
 
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/Massad/gin-boilerplate/models"
@@ -10,10 +12,18 @@ import (
 	"github.com/google/uuid"
 )
 
-// AdminController ...
-type AdminController struct{}
+// AdminController serves the backoffice handlers during the transitory
+// migration window: the model moves into the admin module in Phase 6.
+type AdminController struct {
+	auth *auth.Service
+}
 
 var adminModel = new(models.AdminModel)
+
+// NewAdminController builds the controller on the injected session service.
+func NewAdminController(svc *auth.Service) *AdminController {
+	return &AdminController{auth: svc}
+}
 
 // Login Admin godoc
 // @Summary Login Admin example
@@ -23,10 +33,10 @@ var adminModel = new(models.AdminModel)
 // @Accept json
 // @Produce json
 // @Param auth body forms.LoginForm true "Admin"
-// @Success 	 200  {object}  models.AuthResponse
+// @Success 	 200  {object}  auth.AuthResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /admin/login [post]
-func (ctrl AdminController) Login(c *gin.Context) {
+func (ctl AdminController) Login(c *gin.Context) {
 	var loginForm forms.LoginForm
 
 	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
@@ -41,17 +51,17 @@ func (ctrl AdminController) Login(c *gin.Context) {
 		return
 	}
 
-	tokenDetails, err := authModel.CreateAdminToken(admin.ID)
+	tokenDetails, err := ctl.auth.CreateAdminToken(admin.ID)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Invalid admin login details"})
 		return
 	}
-	if err := authModel.CreateAdminAuth(admin.ID, tokenDetails); err != nil {
+	if err := ctl.auth.CreateAdminAuth(admin.ID, tokenDetails); err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Invalid admin login details"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged in", "token": models.AdminToken{AccessToken: tokenDetails.AccessToken}})
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged in", "token": auth.AdminToken{AccessToken: tokenDetails.AccessToken}})
 }
 
 // Tenants godoc
@@ -63,7 +73,7 @@ func (ctrl AdminController) Login(c *gin.Context) {
 // @Success 	 200  {object}  models.AllTenantResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /admin/tenants [get]
-func (ctrl AdminController) Tenants(c *gin.Context) {
+func (ctl AdminController) Tenants(c *gin.Context) {
 	tenants, err := adminModel.AllTenants()
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Could not list tenants"})
@@ -84,7 +94,7 @@ func (ctrl AdminController) Tenants(c *gin.Context) {
 // @Success 	 200  {object}  models.MessageResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /admin/tenants/{id}/status [post]
-func (ctrl AdminController) SetTenantStatus(c *gin.Context) {
+func (ctl AdminController) SetTenantStatus(c *gin.Context) {
 	adminID, _ := uuid.Parse(c.GetString("adminID"))
 
 	id := c.Param("id")
@@ -114,28 +124,4 @@ func (ctrl AdminController) SetTenantStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": message})
-}
-
-// Logout Admin godoc
-// @Summary Logout Admin example
-// @Schemes
-// @Description Logout Admin example
-// @Tags Admin
-// @Success 	 200  {object}  models.MessageResponse
-// @Failure      406  {object}  models.MessageResponse
-// @Router /admin/logout [get]
-func (ctrl AdminController) Logout(c *gin.Context) {
-	details, err := authModel.ExtractAdminTokenMetadata(c.Request)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "Admin not logged in"})
-		return
-	}
-
-	deleted, delErr := authModel.DeleteAdminAuth(details.AccessUUID)
-	if delErr != nil || deleted == 0 {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Invalid request"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
 }

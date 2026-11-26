@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Massad/gin-boilerplate/forms"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -44,7 +45,7 @@ type UnifiedLoginResult struct {
 	// User, Tenant and Token are set when Kind is LoginKindTenantUser.
 	User   User
 	Tenant TenantPayload
-	Token  Token
+	Token  auth.Token
 	// Admin and AccessToken are set when Kind is LoginKindSuperadmin.
 	Admin       AdminIdentity
 	AccessToken string
@@ -60,7 +61,7 @@ type UnifiedLoginResponse struct {
 	User   User          `json:"user,omitempty"`
 	Tenant TenantPayload `json:"tenant,omitempty"`
 	Admin  AdminIdentity `json:"admin,omitempty"`
-	Token  Token         `json:"token"`
+	Token  auth.Token    `json:"token"`
 }
 
 // UnifiedLogin authenticates against the tenant directory first and falls back
@@ -77,8 +78,8 @@ type UnifiedLoginResponse struct {
 // The no-overlap policy is explicit: a superadmin email must never match a
 // tenant user email, so the two directories are never probed for the same
 // account.
-func UnifiedLogin(form forms.LoginForm) (UnifiedLoginResult, error) {
-	user, tenant, token, userErr := (UserModel{}).Login(form)
+func UnifiedLogin(svc *auth.Service, form forms.LoginForm) (UnifiedLoginResult, error) {
+	user, tenant, token, userErr := (UserModel{auth: svc}).Login(form)
 	switch {
 	case userErr == nil:
 		return UnifiedLoginResult{Kind: LoginKindTenantUser, User: user, Tenant: tenant, Token: token}, nil
@@ -104,11 +105,11 @@ func UnifiedLogin(form forms.LoginForm) (UnifiedLoginResult, error) {
 		return UnifiedLoginResult{}, ErrInvalidCredentials
 	}
 
-	td, err := (AuthModel{}).CreateAdminToken(admin.ID)
+	td, err := svc.CreateAdminToken(admin.ID)
 	if err != nil {
 		return UnifiedLoginResult{}, ErrInvalidCredentials
 	}
-	if err := (AuthModel{}).CreateAdminAuth(admin.ID, td); err != nil {
+	if err := svc.CreateAdminAuth(admin.ID, td); err != nil {
 		return UnifiedLoginResult{}, ErrInvalidCredentials
 	}
 

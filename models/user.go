@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Massad/gin-boilerplate/forms"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,7 +16,7 @@ import (
 type UserLoginResponse struct {
 	User    User          `json:"user"`
 	Tenant  TenantPayload `json:"tenant"`
-	Token   Token         `json:"token"`
+	Token   auth.Token    `json:"token"`
 	Message string        `json:"message"`
 }
 
@@ -41,10 +42,17 @@ type User struct {
 	Role     string    `json:"role"`
 }
 
-// UserModel ...
-type UserModel struct{}
+// UserModel issues and stores the session tokens of a login through the
+// injected session service (transitory window: the login moves into the user
+// module in Phase 5).
+type UserModel struct {
+	auth *auth.Service
+}
 
-var authModel = new(AuthModel)
+// NewUserModel builds the user model on the injected session service.
+func NewUserModel(svc *auth.Service) UserModel {
+	return UserModel{auth: svc}
+}
 
 // ErrTenantSuspended is returned when the credentials are correct but the
 // tenant has been suspended: the HTTP answer is 403.
@@ -58,37 +66,37 @@ func normalizeEmail(email string) string {
 
 // Login authenticates a user on the platform pool (the RLS policies are closed
 // to anonymous lookups): the tenant status is verified before the password.
-func (m UserModel) Login(form forms.LoginForm) (User, TenantPayload, Token, error) {
+func (m UserModel) Login(form forms.LoginForm) (User, TenantPayload, auth.Token, error) {
 	ctx := context.Background()
 
 	row, err := pgdb.AdminStore().GetUserForLogin(ctx, normalizeEmail(form.Email))
 	if err != nil {
-		return User{}, TenantPayload{}, Token{}, err
+		return User{}, TenantPayload{}, auth.Token{}, err
 	}
 	if row.TenantStatus != 1 {
-		return User{}, TenantPayload{}, Token{}, ErrTenantSuspended
+		return User{}, TenantPayload{}, auth.Token{}, ErrTenantSuspended
 	}
 
 	user := User{ID: row.ID, Email: row.Email, Password: row.Password, Name: row.Name, TenantID: row.TenantID, Role: row.Role}
 
 	//Compare the password form and database if match
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(form.Password)); err != nil {
-		return User{}, TenantPayload{}, Token{}, err
+		return User{}, TenantPayload{}, auth.Token{}, err
 	}
 
 	tenant := TenantPayload{ID: row.TenantID.String(), Slug: row.Slug, Name: row.TenantName}
 
 	//Generate the JWT auth token
-	tokenDetails, err := authModel.CreateToken(user.ID, user.TenantID, user.Role)
+	tokenDetails, err := m.auth.CreateToken(user.ID, user.TenantID, user.Role)
 	if err != nil {
-		return User{}, TenantPayload{}, Token{}, err
+		return User{}, TenantPayload{}, auth.Token{}, err
 	}
 
-	if err = authModel.CreateAuth(user.ID, user.TenantID, user.Role, tokenDetails); err != nil {
-		return User{}, TenantPayload{}, Token{}, err
+	if err = m.auth.CreateAuth(user.ID, user.TenantID, user.Role, tokenDetails); err != nil {
+		return User{}, TenantPayload{}, auth.Token{}, err
 	}
 
-	token := Token{AccessToken: tokenDetails.AccessToken, RefreshToken: tokenDetails.RefreshToken}
+	token := auth.Token{AccessToken: tokenDetails.AccessToken, RefreshToken: tokenDetails.RefreshToken}
 
 	return user, tenant, token, nil
 }

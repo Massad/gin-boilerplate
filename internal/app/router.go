@@ -12,10 +12,12 @@ import (
 	"github.com/Massad/gin-boilerplate/controllers"
 	_ "github.com/Massad/gin-boilerplate/docs"
 	"github.com/Massad/gin-boilerplate/internal/modules/article"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	platformmw "github.com/Massad/gin-boilerplate/internal/platform/middleware"
 	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
-	"github.com/Massad/gin-boilerplate/middleware"
+	redisdb "github.com/Massad/gin-boilerplate/internal/platform/redisdb"
+	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -24,10 +26,12 @@ import (
 )
 
 // Deps carries the entrypoint inputs the router needs: the template glob for
-// LoadHTMLGlob and the environment (the Swagger mount is dev-only).
+// LoadHTMLGlob, the environment (the Swagger mount is dev-only) and the three
+// signing secrets of the auth service (validated upstream by the entrypoint).
 type Deps struct {
 	TemplateGlob string
 	Env          string
+	Secrets      auth.Secrets
 }
 
 // spaIndexPath is the built SPA shell served single-origin by this binary.
@@ -62,36 +66,44 @@ func NewRouter(deps Deps) *gin.Engine {
 
 	v1 := r.Group("/v1")
 	{
+		/*** START AUTH MODULE ***/
+		// Composition root of the auth module: the Redis client is read from
+		// the platform singleton here for the transitory window (dette tracée
+		// pour post-Phase 8 : singletons prohibés hors composition root).
+		authSvc := auth.NewService(deps.Secrets, auth.NewRepository(redisdb.GetRedis()))
+		authHandler := auth.NewHandler(authSvc)
+		authSvc.StartSweep(auth.DefaultSweepInterval)
+
 		/*** START USER ***/
-		user := new(controllers.UserController)
+		user := controllers.NewUserController(models.NewUserModel(authSvc))
 
 		v1.POST("/user/login", user.Login)
 		v1.POST("/user/register", user.Register)
-		v1.GET("/user/logout", middleware.TokenAuth(), user.Logout)
+		v1.GET("/user/logout", auth.TokenAuth(authSvc), authHandler.UserLogout)
 
 		/*** START AUTH ***/
-		auth := new(controllers.AuthController)
+		authController := controllers.NewAuthController(authSvc)
 
-		v1.POST("/login", auth.Login)
-		v1.POST("/token/refresh", auth.Refresh)
+		v1.POST("/login", authController.Login)
+		v1.POST("/token/refresh", authController.Refresh)
 
 		/*** START Article ***/
 		articles := article.NewService(article.NewRepository(pgdb.TenantStore()))
 		articleHandler := article.NewHandler(articles)
 
-		v1.POST("/article", middleware.TokenAuth(), articleHandler.Create)
-		v1.GET("/articles", middleware.TokenAuth(), articleHandler.All)
-		v1.GET("/article/:id", middleware.TokenAuth(), articleHandler.One)
-		v1.PUT("/article/:id", middleware.TokenAuth(), articleHandler.Update)
-		v1.DELETE("/article/:id", middleware.TokenAuth(), articleHandler.Delete)
+		v1.POST("/article", auth.TokenAuth(authSvc), articleHandler.Create)
+		v1.GET("/articles", auth.TokenAuth(authSvc), articleHandler.All)
+		v1.GET("/article/:id", auth.TokenAuth(authSvc), articleHandler.One)
+		v1.PUT("/article/:id", auth.TokenAuth(authSvc), articleHandler.Update)
+		v1.DELETE("/article/:id", auth.TokenAuth(authSvc), articleHandler.Delete)
 
 		/*** START ADMIN ***/
-		admin := new(controllers.AdminController)
+		admin := controllers.NewAdminController(authSvc)
 
 		v1.POST("/admin/login", admin.Login)
-		adminAPI := v1.Group("/admin", middleware.AdminAuth())
+		adminAPI := v1.Group("/admin", auth.AdminAuth(authSvc))
 		{
-			adminAPI.GET("/logout", admin.Logout)
+			adminAPI.GET("/logout", authHandler.AdminLogout)
 			adminAPI.GET("/tenants", admin.Tenants)
 			adminAPI.POST("/tenants/:id/status", admin.SetTenantStatus)
 		}

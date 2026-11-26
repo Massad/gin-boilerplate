@@ -1,6 +1,6 @@
 //go:build all
 
-package middleware_test
+package auth_test
 
 import (
 	"net/http"
@@ -8,17 +8,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Massad/gin-boilerplate/controllers"
+	"github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
-	"github.com/Massad/gin-boilerplate/middleware"
-	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func middlewareTestSetup(t *testing.T) *models.AuthModel {
+func middlewareTestSetup(t *testing.T) *auth.Service {
 	t.Helper()
 	if os.Getenv("REDIS_HOST") == "" {
 		t.Skip("set REDIS_HOST to an isolated Redis instance")
@@ -31,26 +29,33 @@ func middlewareTestSetup(t *testing.T) *models.AuthModel {
 	require.Equal(t, 2, redisdb.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
 	t.Cleanup(func() { _ = redisdb.GetRedis().Close() })
 	require.NoError(t, redisdb.GetRedis().Ping().Err())
-	return new(models.AuthModel)
+	return auth.NewService(
+		auth.Secrets{
+			Access:      os.Getenv("ACCESS_SECRET"),
+			Refresh:     os.Getenv("REFRESH_SECRET"),
+			AdminAccess: os.Getenv("ADMIN_ACCESS_SECRET"),
+		},
+		auth.NewRepository(redisdb.GetRedis()),
+	)
 }
 
 func TestAccessTokenRejectedAfterLogout(t *testing.T) {
-	auth := middlewareTestSetup(t)
+	svc := middlewareTestSetup(t)
 	userID := uuid.New()
 	tenantID := uuid.New()
-	tokens, err := auth.CreateToken(userID, tenantID, "owner")
+	tokens, err := svc.CreateToken(userID, tenantID, "owner")
 	require.NoError(t, err)
-	require.NoError(t, auth.CreateAuth(userID, tenantID, "owner", tokens))
+	require.NoError(t, svc.CreateAuth(userID, tenantID, "owner", tokens))
 	t.Cleanup(func() { redisdb.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 	r := gin.New()
-	r.GET("/protected", middleware.TokenAuth(), func(c *gin.Context) {
+	r.GET("/protected", auth.TokenAuth(svc), func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"user_id":   c.GetString("userID"),
 			"tenant_id": c.GetString("tenantID"),
 			"role":      c.GetString("role"),
 		})
 	})
-	r.GET("/logout", middleware.TokenAuth(), new(controllers.UserController).Logout)
+	r.GET("/logout", auth.TokenAuth(svc), auth.NewHandler(svc).UserLogout)
 	for _, step := range []struct {
 		path   string
 		status int
@@ -69,23 +74,23 @@ func TestAccessTokenRejectedAfterLogout(t *testing.T) {
 	// JWT signature and expiry remain valid: rejection must come from Redis.
 	req := httptest.NewRequest("GET", "/protected", nil)
 	req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
-	token, err := auth.VerifyToken(req)
+	token, err := svc.VerifyToken(req)
 	require.NoError(t, err, "test token unexpectedly invalid: %v", err)
 	require.True(t, token.Valid, "test token unexpectedly invalid")
 }
 
 func TestTokenAuthExposesTenantClaims(t *testing.T) {
-	auth := middlewareTestSetup(t)
+	svc := middlewareTestSetup(t)
 	userID := uuid.New()
 	tenantID := uuid.New()
-	tokens, err := auth.CreateToken(userID, tenantID, "member")
+	tokens, err := svc.CreateToken(userID, tenantID, "member")
 	require.NoError(t, err)
-	require.NoError(t, auth.CreateAuth(userID, tenantID, "member", tokens))
+	require.NoError(t, svc.CreateAuth(userID, tenantID, "member", tokens))
 	t.Cleanup(func() { redisdb.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 
 	var gotUserID, gotTenantID, gotRole string
 	r := gin.New()
-	r.GET("/protected", middleware.TokenAuth(), func(c *gin.Context) {
+	r.GET("/protected", auth.TokenAuth(svc), func(c *gin.Context) {
 		gotUserID = c.GetString("userID")
 		gotTenantID = c.GetString("tenantID")
 		gotRole = c.GetString("role")
@@ -102,15 +107,15 @@ func TestTokenAuthExposesTenantClaims(t *testing.T) {
 }
 
 func TestTokenAuthRejectsAdminToken(t *testing.T) {
-	auth := middlewareTestSetup(t)
+	svc := middlewareTestSetup(t)
 	adminID := uuid.New()
-	adminTokens, err := auth.CreateAdminToken(adminID)
+	adminTokens, err := svc.CreateAdminToken(adminID)
 	require.NoError(t, err)
-	require.NoError(t, auth.CreateAdminAuth(adminID, adminTokens))
+	require.NoError(t, svc.CreateAdminAuth(adminID, adminTokens))
 	t.Cleanup(func() { redisdb.GetRedis().Del("admin:" + adminTokens.AccessUUID) })
 
 	r := gin.New()
-	r.GET("/protected", middleware.TokenAuth(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	r.GET("/protected", auth.TokenAuth(svc), func(c *gin.Context) { c.Status(http.StatusOK) })
 	req := httptest.NewRequest("GET", "/protected", nil)
 	req.Header.Set("Authorization", "Bearer "+adminTokens.AccessToken)
 	w := httptest.NewRecorder()
@@ -119,16 +124,16 @@ func TestTokenAuthRejectsAdminToken(t *testing.T) {
 }
 
 func TestAdminAuthRejectsTenantToken(t *testing.T) {
-	auth := middlewareTestSetup(t)
+	svc := middlewareTestSetup(t)
 	userID := uuid.New()
 	tenantID := uuid.New()
-	tokens, err := auth.CreateToken(userID, tenantID, "owner")
+	tokens, err := svc.CreateToken(userID, tenantID, "owner")
 	require.NoError(t, err)
-	require.NoError(t, auth.CreateAuth(userID, tenantID, "owner", tokens))
+	require.NoError(t, svc.CreateAuth(userID, tenantID, "owner", tokens))
 	t.Cleanup(func() { redisdb.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 
 	r := gin.New()
-	r.GET("/admin", middleware.AdminAuth(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	r.GET("/admin", auth.AdminAuth(svc), func(c *gin.Context) { c.Status(http.StatusOK) })
 	req := httptest.NewRequest("GET", "/admin", nil)
 	req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 	w := httptest.NewRecorder()
@@ -137,16 +142,16 @@ func TestAdminAuthRejectsTenantToken(t *testing.T) {
 }
 
 func TestAdminAuthAcceptsAdminToken(t *testing.T) {
-	auth := middlewareTestSetup(t)
+	svc := middlewareTestSetup(t)
 	adminID := uuid.New()
-	adminTokens, err := auth.CreateAdminToken(adminID)
+	adminTokens, err := svc.CreateAdminToken(adminID)
 	require.NoError(t, err)
-	require.NoError(t, auth.CreateAdminAuth(adminID, adminTokens))
+	require.NoError(t, svc.CreateAdminAuth(adminID, adminTokens))
 	t.Cleanup(func() { redisdb.GetRedis().Del("admin:" + adminTokens.AccessUUID) })
 
 	var gotAdminID string
 	r := gin.New()
-	r.GET("/admin", middleware.AdminAuth(), func(c *gin.Context) {
+	r.GET("/admin", auth.AdminAuth(svc), func(c *gin.Context) {
 		gotAdminID = c.GetString("adminID")
 		c.Status(http.StatusOK)
 	})
@@ -181,7 +186,7 @@ func TestRequirePermission(t *testing.T) {
 				}
 				c.Next()
 			})
-			r.GET("/manage", middleware.RequirePermission(middleware.PermManageMembers), func(c *gin.Context) { c.Status(http.StatusOK) })
+			r.GET("/manage", auth.RequirePermission(auth.PermManageMembers), func(c *gin.Context) { c.Status(http.StatusOK) })
 			req := httptest.NewRequest("GET", "/manage", nil)
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, req)
@@ -193,7 +198,7 @@ func TestRequirePermission(t *testing.T) {
 // A role-less token cannot be extracted at all: the claim check guarantees the
 // admin token shape never passes TokenAuth.
 func TestTokenAuthRejectsTokenWithoutRole(t *testing.T) {
-	middlewareTestSetup(t)
+	svc := middlewareTestSetup(t)
 	tenantID := uuid.New()
 	userID := uuid.New()
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -205,7 +210,7 @@ func TestTokenAuthRejectsTokenWithoutRole(t *testing.T) {
 	require.NoError(t, err)
 	_ = tenantID
 	r := gin.New()
-	r.GET("/protected", middleware.TokenAuth(), func(c *gin.Context) { c.Status(http.StatusOK) })
+	r.GET("/protected", auth.TokenAuth(svc), func(c *gin.Context) { c.Status(http.StatusOK) })
 	req := httptest.NewRequest("GET", "/protected", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()

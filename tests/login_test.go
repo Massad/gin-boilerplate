@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Massad/gin-boilerplate/forms"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
@@ -61,7 +62,7 @@ func TestUnifiedLoginTenantUser(t *testing.T) {
 		Kind   string               `json:"kind"`
 		User   models.User          `json:"user"`
 		Tenant models.TenantPayload `json:"tenant"`
-		Token  models.Token         `json:"token"`
+		Token  auth.Token          `json:"token"`
 	}
 	decode(t, resp, &res)
 

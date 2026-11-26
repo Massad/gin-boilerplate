@@ -11,10 +11,19 @@ import (
 	"github.com/google/uuid"
 )
 
-// UserController ...
-type UserController struct{}
+// UserController serves the user login and register handlers during the
+// transitory migration window: they move into the user module in Phase 5.
+type UserController struct {
+	users models.UserModel
+}
 
 var userModel = new(models.UserModel)
+
+// NewUserController builds the controller on the injected user model (which
+// consumes the *auth.Service at the composition root).
+func NewUserController(users models.UserModel) *UserController {
+	return &UserController{users: users}
+}
 
 // getUserID reads the authenticated user id set by TokenAuth.
 func getUserID(c *gin.Context) (userID uuid.UUID) {
@@ -44,7 +53,7 @@ func getRole(c *gin.Context) (role string) {
 // @Success 	 200  {object}  models.UserLoginResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /user/login [post]
-func (ctrl UserController) Login(c *gin.Context) {
+func (ctl UserController) Login(c *gin.Context) {
 	var loginForm forms.LoginForm
 
 	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
@@ -53,7 +62,7 @@ func (ctrl UserController) Login(c *gin.Context) {
 		return
 	}
 
-	user, tenant, token, err := userModel.Login(loginForm)
+	user, tenant, token, err := ctl.users.Login(loginForm)
 	if err != nil {
 		if errors.Is(err, models.ErrTenantSuspended) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Tenant suspended"})
@@ -77,7 +86,7 @@ func (ctrl UserController) Login(c *gin.Context) {
 // @Success 	 200  {object}  models.UserLoginResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /user/register [post]
-func (ctrl UserController) Register(c *gin.Context) {
+func (ctl UserController) Register(c *gin.Context) {
 	var registerForm forms.RegisterForm
 
 	if validationErr := c.ShouldBindJSON(&registerForm); validationErr != nil {
@@ -86,7 +95,7 @@ func (ctrl UserController) Register(c *gin.Context) {
 		return
 	}
 
-	user, tenant, err := userModel.Register(registerForm)
+	user, tenant, err := ctl.users.Register(registerForm)
 	if err != nil {
 		if errors.Is(err, models.ErrInvalidSlug) || errors.Is(err, models.ErrSlugUnavailable) {
 			c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": err.Error()})
@@ -99,30 +108,4 @@ func (ctrl UserController) Register(c *gin.Context) {
 	payload := models.TenantPayload{ID: tenant.ID.String(), Slug: tenant.Slug, Name: tenant.Name}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully registered", "user": user, "tenant": payload})
-}
-
-// Logout User godoc
-// @Summary Logout User example
-// @Schemes
-// @Description Logout User example
-// @Tags User
-// @Accept json
-// @Produce json
-// @Success 	 200  {object}  models.MessageResponse
-// @Failure      406  {object}  models.MessageResponse
-// @Router /user/logout [GET]
-func (ctrl UserController) Logout(c *gin.Context) {
-	au, err := authModel.ExtractTokenMetadata(c.Request)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "User not logged in"})
-		return
-	}
-
-	deleted, delErr := authModel.DeleteAuth(au.AccessUUID, au.UserID)
-	if delErr != nil || deleted == 0 {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Invalid request"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
 }
