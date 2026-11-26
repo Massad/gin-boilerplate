@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -47,7 +48,7 @@ func (ctrl UserController) Login(c *gin.Context) {
 	var loginForm forms.LoginForm
 
 	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
-		message := forms.Translate(validationErr, forms.LoginMessages)
+		message := validate.Translate(validationErr, forms.LoginMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
@@ -80,7 +81,7 @@ func (ctrl UserController) Register(c *gin.Context) {
 	var registerForm forms.RegisterForm
 
 	if validationErr := c.ShouldBindJSON(&registerForm); validationErr != nil {
-		message := forms.Translate(validationErr, forms.RegisterMessages)
+		message := validate.Translate(validationErr, forms.RegisterMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}

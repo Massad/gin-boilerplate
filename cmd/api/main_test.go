@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"

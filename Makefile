@@ -47,7 +47,7 @@ check_ports:
 ## RUN APPLICATION
 run: services_up
 	@echo -e "🚀 Running the application..."
-	@go run .
+	@go run -mod=readonly ./cmd/api
 
 ## RUN TESTS
 ## - Recreates the disposable artisan_test database and applies the migrations before the suites (the dev database is never touched).
@@ -85,7 +85,7 @@ install_swag:
 ## GENERATE API DOCUMENTATION
 generate_docs: install_swag
 	@echo -e "📜 Generating API documentation using Swag..."
-	@"$(SWAG_BIN)" init
+	@"$(SWAG_BIN)" init -g cmd/api/main.go
 	@echo -e "✅ API documentation generated successfully!"
 
 ## v1.27.0 crashed at startup in this environment (old wazero wasm runtime
@@ -168,7 +168,7 @@ e2e: services_up
 	"$(MAKE)" --no-print-directory SHELL="$(SHELL)" migrate_up DB_NAME=$(E2E_DB_NAME) DB_USER=postgres DB_PASS=postgres DB_HOST="$$DB_HOST" DB_PORT="$$DB_PORT" SSL="$$SSL"
 	@echo -e "👤 Seeding the e2e superadmin..."
 	@if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	DB_NAME=$(E2E_DB_NAME) go run -mod=readonly . -create-admin -email admin@e2e.local -password e2e-admin-password-0 -name "Prénom Nom"
+	DB_NAME=$(E2E_DB_NAME) go run -mod=readonly ./cmd/api -create-admin -email admin@e2e.local -password e2e-admin-password-0 -name "Prénom Nom"
 	@echo -e "🏗️  Building the frontend..."
 	@cd app && $(PNPM) build
 	@echo -e "🎭 Running the Playwright suite..."

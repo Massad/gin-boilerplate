@@ -80,12 +80,12 @@ jobs:
       - name: Build and vet
         run: |
           go mod verify
-          go build -mod=readonly -o /tmp/gin-boilerplate .
+          go build -mod=readonly -o /tmp/gin-boilerplate ./cmd/api
           go vet -mod=readonly ./...
       - name: Verify generated sqlc code
         run: |
           make generate_sqlc
-          git diff --exit-code internal/db
+          git diff --exit-code internal/platform/db
       - name: Check removed legacy drivers
         run: |
           # Comment prose may mention the retired drivers; only quoted import

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Massad/gin-boilerplate/db"
+	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	"github.com/go-redis/redis/v7"
 	jwt "github.com/golang-jwt/jwt/v4"
 	uuid "github.com/google/uuid"
@@ -116,15 +116,15 @@ func (m AuthModel) CreateAuth(userID, tenantID uuid.UUID, role string, td *Token
 	now := time.Now()
 	value := fmt.Sprintf("%v:%v:%v", userID, tenantID, role)
 
-	errAccess := db.GetRedis().Set(td.AccessUUID, value, at.Sub(now)).Err()
+	errAccess := redisdb.GetRedis().Set(td.AccessUUID, value, at.Sub(now)).Err()
 	if errAccess != nil {
 		return errAccess
 	}
-	errRefresh := db.GetRedis().Set(td.RefreshUUID, value, rt.Sub(now)).Err()
+	errRefresh := redisdb.GetRedis().Set(td.RefreshUUID, value, rt.Sub(now)).Err()
 	if errRefresh != nil {
 		return errRefresh
 	}
-	return db.GetRedis().SAdd(fmt.Sprintf(userSessionIndex, userID), td.AccessUUID, td.RefreshUUID).Err()
+	return redisdb.GetRedis().SAdd(fmt.Sprintf(userSessionIndex, userID), td.AccessUUID, td.RefreshUUID).Err()
 }
 
 // ExtractToken ...
@@ -207,7 +207,7 @@ func uuidClaim(claims jwt.MapClaims, name string) (uuid.UUID, error) {
 // FetchAuth verifies that the session exists in Redis and belongs to the
 // claimed user, before handing the tenant identity back to the middleware.
 func (m AuthModel) FetchAuth(authD *AccessDetails) (uuid.UUID, error) {
-	stored, err := db.GetRedis().Get(authD.AccessUUID).Result()
+	stored, err := redisdb.GetRedis().Get(authD.AccessUUID).Result()
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -229,11 +229,11 @@ func (m AuthModel) FetchAuth(authD *AccessDetails) (uuid.UUID, error) {
 // index.
 func (m AuthModel) DeleteAuth(givenUUID string, userID uuid.UUID) (int64, error) {
 	if userID != uuid.Nil {
-		if err := db.GetRedis().SRem(fmt.Sprintf(userSessionIndex, userID), givenUUID).Err(); err != nil {
+		if err := redisdb.GetRedis().SRem(fmt.Sprintf(userSessionIndex, userID), givenUUID).Err(); err != nil {
 			return 0, err
 		}
 	}
-	deleted, err := db.GetRedis().Del(givenUUID).Result()
+	deleted, err := redisdb.GetRedis().Del(givenUUID).Result()
 	if err != nil {
 		return 0, err
 	}
@@ -244,16 +244,16 @@ func (m AuthModel) DeleteAuth(givenUUID string, userID uuid.UUID) (int64, error)
 // administrative logout).
 func (m AuthModel) RevokeUserSessions(userID uuid.UUID) error {
 	index := fmt.Sprintf(userSessionIndex, userID)
-	sessions, err := db.GetRedis().SMembers(index).Result()
+	sessions, err := redisdb.GetRedis().SMembers(index).Result()
 	if err != nil {
 		return err
 	}
 	if len(sessions) > 0 {
-		if err := db.GetRedis().Del(sessions...).Err(); err != nil {
+		if err := redisdb.GetRedis().Del(sessions...).Err(); err != nil {
 			return err
 		}
 	}
-	return db.GetRedis().Del(index).Err()
+	return redisdb.GetRedis().Del(index).Err()
 }
 
 // userSessionIndex is the Redis set holding every active UUID of a user.
@@ -273,7 +273,7 @@ return 0
 // login and a refresh. A mismatched owner must not invalidate someone else's
 // session.
 func (m AuthModel) ConsumeRefreshAuth(refreshUUID string, userID uuid.UUID) (int64, error) {
-	return consumeRefreshAuth.Run(db.GetRedis(), []string{refreshUUID}, userID.String()).Int64()
+	return consumeRefreshAuth.Run(redisdb.GetRedis(), []string{refreshUUID}, userID.String()).Int64()
 }
 
 // CreateAdminToken issues the single superadmin access token: signed with the
@@ -302,7 +302,7 @@ func (m AuthModel) CreateAdminToken(adminID uuid.UUID) (*AdminTokenDetails, erro
 // CreateAdminAuth stores the admin session under the admin: Redis prefix.
 func (m AuthModel) CreateAdminAuth(adminID uuid.UUID, td *AdminTokenDetails) error {
 	expires := time.Unix(td.AtExpires, 0)
-	return db.GetRedis().Set(adminSessionKey(td.AccessUUID), adminID.String(), expires.Sub(time.Now())).Err()
+	return redisdb.GetRedis().Set(adminSessionKey(td.AccessUUID), adminID.String(), expires.Sub(time.Now())).Err()
 }
 
 // ExtractAdminTokenMetadata validates an admin token against the ADMIN_ACCESS
@@ -335,7 +335,7 @@ func (m AuthModel) ExtractAdminTokenMetadata(r *http.Request) (*AdminAccessDetai
 
 // FetchAdmin verifies the admin session exists in Redis.
 func (m AuthModel) FetchAdmin(authD *AdminAccessDetails) (uuid.UUID, error) {
-	stored, err := db.GetRedis().Get(adminSessionKey(authD.AccessUUID)).Result()
+	stored, err := redisdb.GetRedis().Get(adminSessionKey(authD.AccessUUID)).Result()
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -351,7 +351,7 @@ func (m AuthModel) FetchAdmin(authD *AdminAccessDetails) (uuid.UUID, error) {
 
 // DeleteAdminAuth consumes an admin session: immediate logout, no refresh.
 func (m AuthModel) DeleteAdminAuth(givenUUID string) (int64, error) {
-	return db.GetRedis().Del(adminSessionKey(givenUUID)).Result()
+	return redisdb.GetRedis().Del(adminSessionKey(givenUUID)).Result()
 }
 
 // adminSessionKey prefixes admin session keys so they cannot collide with

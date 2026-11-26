@@ -42,7 +42,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Massad/gin-boilerplate/db"
+	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	"github.com/go-redis/redis/v7"
 	"github.com/jackc/pgx/v5"
 )
@@ -129,11 +129,11 @@ func validateTarget(target, appDB string) error {
 // db package and refuses the dev index when REDIS_DB is unset: the e2e cycle
 // must never flush the dev sessions by accident.
 func redisFlushIndex(getenv func(string) string) (int, error) {
-	index, err := db.RedisDBIndex(getenv)
+	index, err := redisdb.RedisDBIndex(getenv)
 	if err != nil {
 		return 0, err
 	}
-	if strings.TrimSpace(getenv("REDIS_DB")) == "" && index == db.DefaultRedisDB {
+	if strings.TrimSpace(getenv("REDIS_DB")) == "" && index == redisdb.DefaultRedisDB {
 		return 0, errors.New("REDIS_DB is unset: refusing to flush the dev Redis index (1)")
 	}
 	return index, nil
@@ -197,7 +197,7 @@ func superuserCredentials(getenv func(string) string) (string, string) {
 
 // dsn builds the libpq keyword/value connection string of the given
 // database. The values are quoted exactly like the application pools do
-// (internal/db).
+// (internal/platform/db).
 func dsn(getenv func(string) string, database string) string {
 	quote := func(value string) string {
 		return "'" + strings.NewReplacer("\\", "\\\\", "'", "\\'").Replace(value) + "'"

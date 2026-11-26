@@ -1,4 +1,4 @@
-package forms
+package validate
 
 import (
 	"encoding/json"

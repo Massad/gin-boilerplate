@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Massad/gin-boilerplate/forms"
+	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/Massad/gin-boilerplate/models"
 )
 
@@ -79,11 +79,11 @@ func TestNewArticleFixtureDeterministic(t *testing.T) {
 	require.Equal(t, formA, formB)
 }
 
-// validateForm runs the same binding.DefaultValidator the routes use, so the
+// validateForm runs the same validate.DefaultValidator the routes use, so the
 // factories cannot silently drift from the real validators.
 func validateForm(t *testing.T, form interface{}) error {
 	t.Helper()
-	binding.Validator = new(forms.DefaultValidator)
+	binding.Validator = new(validate.DefaultValidator)
 	return binding.Validator.ValidateStruct(form)
 }
 

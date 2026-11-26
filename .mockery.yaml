@@ -1,13 +1,12 @@
 # Mockery v2 configuration: the only interfaces declared in the project live
 # in internal/db (sqlc-generated DBTX and Querier). Mocks are committed under
 # internal/mocks/; regeneration must leave `git diff` empty.
-version: 2
 with-expecter: true
 disable-version-string: true
 resolve-type-alias: false
 issue-845-fix: true
 packages:
-  github.com/Massad/gin-boilerplate/internal/db:
+  github.com/Massad/gin-boilerplate/internal/platform/db:
     config:
       dir: "{{.InterfaceDir}}/../mocks"
       outpkg: mocks

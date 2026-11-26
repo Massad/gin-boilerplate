@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
@@ -35,7 +36,7 @@ func (ctl AuthController) Login(c *gin.Context) {
 	var loginForm forms.LoginForm
 
 	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
-		message := forms.Translate(validationErr, forms.LoginMessages)
+		message := validate.Translate(validationErr, forms.LoginMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}

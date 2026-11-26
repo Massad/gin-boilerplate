@@ -48,7 +48,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "go run .",
+    command: "go run -mod=readonly ./cmd/api",
     // The binary serves app/dist and loads .env: it must run from the
     // repository root (the directory of this configuration file is app/).
     cwd: "..",

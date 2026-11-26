@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/Massad/gin-boilerplate/controllers"
-	"github.com/Massad/gin-boilerplate/db"
+	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	"github.com/Massad/gin-boilerplate/middleware"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
@@ -27,10 +27,10 @@ func middlewareTestSetup(t *testing.T) *models.AuthModel {
 	t.Setenv("REFRESH_SECRET", "refresh-key-for-isolated-tests-only-32-bytes")
 	t.Setenv("ADMIN_ACCESS_SECRET", "admin-key-for-isolated-tests-only-32-byt")
 	gin.SetMode(gin.TestMode)
-	require.NoError(t, db.InitRedis(), "resolving the Redis database index")
-	require.Equal(t, 2, db.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
-	t.Cleanup(func() { _ = db.GetRedis().Close() })
-	require.NoError(t, db.GetRedis().Ping().Err())
+	require.NoError(t, redisdb.InitRedis(), "resolving the Redis database index")
+	require.Equal(t, 2, redisdb.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
+	t.Cleanup(func() { _ = redisdb.GetRedis().Close() })
+	require.NoError(t, redisdb.GetRedis().Ping().Err())
 	return new(models.AuthModel)
 }
 
@@ -41,7 +41,7 @@ func TestAccessTokenRejectedAfterLogout(t *testing.T) {
 	tokens, err := auth.CreateToken(userID, tenantID, "owner")
 	require.NoError(t, err)
 	require.NoError(t, auth.CreateAuth(userID, tenantID, "owner", tokens))
-	t.Cleanup(func() { db.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
+	t.Cleanup(func() { redisdb.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 	r := gin.New()
 	r.GET("/protected", middleware.TokenAuth(), func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -81,7 +81,7 @@ func TestTokenAuthExposesTenantClaims(t *testing.T) {
 	tokens, err := auth.CreateToken(userID, tenantID, "member")
 	require.NoError(t, err)
 	require.NoError(t, auth.CreateAuth(userID, tenantID, "member", tokens))
-	t.Cleanup(func() { db.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
+	t.Cleanup(func() { redisdb.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 
 	var gotUserID, gotTenantID, gotRole string
 	r := gin.New()
@@ -107,7 +107,7 @@ func TestTokenAuthRejectsAdminToken(t *testing.T) {
 	adminTokens, err := auth.CreateAdminToken(adminID)
 	require.NoError(t, err)
 	require.NoError(t, auth.CreateAdminAuth(adminID, adminTokens))
-	t.Cleanup(func() { db.GetRedis().Del("admin:" + adminTokens.AccessUUID) })
+	t.Cleanup(func() { redisdb.GetRedis().Del("admin:" + adminTokens.AccessUUID) })
 
 	r := gin.New()
 	r.GET("/protected", middleware.TokenAuth(), func(c *gin.Context) { c.Status(http.StatusOK) })
@@ -125,7 +125,7 @@ func TestAdminAuthRejectsTenantToken(t *testing.T) {
 	tokens, err := auth.CreateToken(userID, tenantID, "owner")
 	require.NoError(t, err)
 	require.NoError(t, auth.CreateAuth(userID, tenantID, "owner", tokens))
-	t.Cleanup(func() { db.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
+	t.Cleanup(func() { redisdb.GetRedis().Del(tokens.AccessUUID, tokens.RefreshUUID) })
 
 	r := gin.New()
 	r.GET("/admin", middleware.AdminAuth(), func(c *gin.Context) { c.Status(http.StatusOK) })
@@ -142,7 +142,7 @@ func TestAdminAuthAcceptsAdminToken(t *testing.T) {
 	adminTokens, err := auth.CreateAdminToken(adminID)
 	require.NoError(t, err)
 	require.NoError(t, auth.CreateAdminAuth(adminID, adminTokens))
-	t.Cleanup(func() { db.GetRedis().Del("admin:" + adminTokens.AccessUUID) })
+	t.Cleanup(func() { redisdb.GetRedis().Del("admin:" + adminTokens.AccessUUID) })
 
 	var gotAdminID string
 	r := gin.New()

@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/stretchr/testify/require"
 
-	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 )
 
 // fixtureFiles is dependency ordered: the loader deletes and inserts in this

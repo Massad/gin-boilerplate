@@ -1,5 +1,9 @@
 package forms
 
+import (
+	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
+)
+
 // CreateArticleForm ...
 type CreateArticleForm struct {
 	Title   string `form:"title" json:"title" binding:"required,min=3,max=100"`
@@ -13,7 +17,7 @@ type ArticleResponse struct {
 }
 
 // ArticleMessages defines validation error messages for article forms.
-var ArticleMessages = ValidationMessages{
+var ArticleMessages = validate.ValidationMessages{
 	"Title": {
 		"required": "Please enter the article title",
 		"min":      "Title should be between 3 to 100 characters",

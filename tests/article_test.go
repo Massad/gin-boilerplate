@@ -16,72 +16,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Massad/gin-boilerplate/controllers"
-	"github.com/Massad/gin-boilerplate/db"
 	"github.com/Massad/gin-boilerplate/forms"
-	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	"github.com/Massad/gin-boilerplate/internal/app"
+	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
+	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
-	"github.com/Massad/gin-boilerplate/middleware"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
 )
 
-func SetupRouter() *gin.Engine {
-	r := gin.Default()
+// testRouter builds a fresh production-shaped router for the HTTP suites: the
+// real app.NewRouter wiring, with the suite's template glob and test mode.
+func testRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
-
-	//Custom form validator
-	binding.Validator = new(forms.DefaultValidator)
-
-	v1 := r.Group("/v1")
-	{
-		/*** START USER ***/
-		user := new(controllers.UserController)
-
-		v1.POST("/user/login", user.Login)
-		v1.POST("/user/register", user.Register)
-		v1.GET("/user/logout", middleware.TokenAuth(), user.Logout)
-
-		/*** START AUTH ***/
-		auth := new(controllers.AuthController)
-
-		v1.POST("/login", auth.Login)
-		v1.POST("/token/refresh", auth.Refresh)
-
-		/*** START Article ***/
-		article := new(controllers.ArticleController)
-
-		v1.POST("/article", middleware.TokenAuth(), article.Create)
-		v1.GET("/articles", middleware.TokenAuth(), article.All)
-		v1.GET("/article/:id", middleware.TokenAuth(), article.One)
-		v1.PUT("/article/:id", middleware.TokenAuth(), article.Update)
-		v1.DELETE("/article/:id", middleware.TokenAuth(), article.Delete)
-
-		/*** START ADMIN ***/
-		admin := new(controllers.AdminController)
-
-		v1.POST("/admin/login", admin.Login)
-		adminAPI := v1.Group("/admin", middleware.AdminAuth())
-		{
-			adminAPI.GET("/logout", admin.Logout)
-			adminAPI.GET("/tenants", admin.Tenants)
-			adminAPI.POST("/tenants/:id/status", admin.SetTenantStatus)
-		}
-	}
-
-	r.LoadHTMLGlob("../public/html/*")
-
-	return r
-}
-
-func main() {
-	r := SetupRouter()
-	r.Run()
+	return app.NewRouter(app.Deps{TemplateGlob: "../public/html/*", Env: os.Getenv("ENV")})
 }
 
 // doRequest runs one request against the router and returns the recorder.
@@ -159,8 +111,8 @@ func TestIntDB(t *testing.T) {
 	var suiteDB string
 	require.NoError(t, pgdb.AdminStore().Pool.QueryRow(ctx, "SELECT current_database()").Scan(&suiteDB))
 	require.Equal(t, "artisan_test", suiteDB, "the suite must run on the disposable database artisan_test")
-	require.NoError(t, db.InitRedis(), "resolving the Redis database index")
-	require.Equal(t, 2, db.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
+	require.NoError(t, redisdb.InitRedis(), "resolving the Redis database index")
+	require.Equal(t, 2, redisdb.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
 
 	// The suite's starting data is declarative: admin_user.yml carries the
 	// backoffice admin, while tenant/user/article start empty (the suite
@@ -175,7 +127,7 @@ func TestIntDB(t *testing.T) {
 * Must return response code 200
  */
 func TestRegister(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	registerForm := forms.RegisterForm{
 		Name:     "testing",
@@ -216,7 +168,7 @@ func TestRegister(t *testing.T) {
 * Must return response code 406
  */
 func TestRegisterReservedSlug(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	registerForm := forms.RegisterForm{
 		Name:     "testing",
@@ -236,7 +188,7 @@ func TestRegisterReservedSlug(t *testing.T) {
 * Must return response code 406
  */
 func TestRegisterDuplicateEmail(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	registerForm := forms.RegisterForm{
 		Name:     "testing",
@@ -256,7 +208,7 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 * Must return response code 406
  */
 func TestRegisterInvalidEmail(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	registerForm := forms.RegisterForm{
 		Name:     "testing",
@@ -277,7 +229,7 @@ func TestRegisterInvalidEmail(t *testing.T) {
 * Must return response code 200
  */
 func TestLogin(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	loginForm := forms.LoginForm{
 		Email:    testEmail,
@@ -321,7 +273,7 @@ func TestLogin(t *testing.T) {
 * Must return response code 200
  */
 func TestLoginUppercaseEmail(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	loginForm := forms.LoginForm{
 		Email:    strings.ToUpper(testEmail),
@@ -339,7 +291,7 @@ func TestLoginUppercaseEmail(t *testing.T) {
 * Must return response code 406
  */
 func TestInvalidLogin(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	loginForm := forms.LoginForm{
 		Email:    "wrong@email.com",
@@ -357,7 +309,7 @@ func TestInvalidLogin(t *testing.T) {
 * Must return response code 200
  */
 func TestCreateArticle(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	form := forms.CreateArticleForm{
 		Title:   "Testing article title",
@@ -384,7 +336,7 @@ func TestCreateArticle(t *testing.T) {
 * Must return response code 200 and contain the created article
  */
 func TestListArticles(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/articles", nil, accessToken)
 
@@ -419,7 +371,7 @@ func TestListArticles(t *testing.T) {
 * Must return response code 200
  */
 func TestGetArticle(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, accessToken)
 	require.Equal(t, http.StatusOK, resp.Code)
@@ -443,7 +395,7 @@ func TestGetArticle(t *testing.T) {
 * Must return response code 404
  */
 func TestGetInvalidArticle(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/article/invalid", nil, accessToken)
 	require.Equal(t, http.StatusNotFound, resp.Code)
@@ -456,7 +408,7 @@ func TestGetInvalidArticle(t *testing.T) {
 * Must return response code 401
  */
 func TestGetArticleNotLoggedin(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, "")
 	require.Equal(t, http.StatusUnauthorized, resp.Code)
@@ -469,7 +421,7 @@ func TestGetArticleNotLoggedin(t *testing.T) {
 * Must return response code 401
  */
 func TestGetArticleUnauthorized(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, "abc123")
 	require.Equal(t, http.StatusUnauthorized, resp.Code)
@@ -482,7 +434,7 @@ func TestGetArticleUnauthorized(t *testing.T) {
 * Must return response code 200
  */
 func TestUpdateArticle(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	form := forms.CreateArticleForm{
 		Title:   "Testing new article title",
@@ -499,7 +451,7 @@ func TestUpdateArticle(t *testing.T) {
 * list stays empty; and it creates and reads its own article.
  */
 func TestCrossTenantIsolation(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	// Register tenant B.
 	registerForm := forms.RegisterForm{
@@ -569,7 +521,7 @@ func TestCrossTenantIsolation(t *testing.T) {
 * Must return response code 200
  */
 func TestGetArticleB(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	form := forms.CreateArticleForm{
 		Title:   "B article title",
@@ -681,7 +633,7 @@ func TestOneOwnerConstraint(t *testing.T) {
 * Must return response code 200
  */
 func TestRefreshToken(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	tokenForm := forms.Token{RefreshToken: refreshToken}
 
@@ -708,7 +660,7 @@ func TestRefreshToken(t *testing.T) {
 * Must return response code 401
  */
 func TestInvalidRefreshToken(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	//Since we didn't update it in the test before - this will not be valid anymore
 	tokenForm := forms.Token{RefreshToken: refreshToken}
@@ -724,7 +676,7 @@ func TestInvalidRefreshToken(t *testing.T) {
 * Must return response code 200
  */
 func TestUserLogout(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/user/logout", nil, accessToken)
 	require.Equal(t, http.StatusOK, resp.Code)
@@ -737,7 +689,7 @@ func TestUserLogout(t *testing.T) {
 * Must return response code 200
  */
 func TestAdminLogin(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	loginForm := forms.LoginForm{Email: testAdminEmail, Password: testAdminPassword}
 
@@ -762,7 +714,7 @@ func TestAdminLogin(t *testing.T) {
 * Must return response code 406
  */
 func TestAdminLoginWithUserCredentials(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	loginForm := forms.LoginForm{Email: testEmail, Password: testPassword}
 
@@ -777,7 +729,7 @@ func TestAdminLoginWithUserCredentials(t *testing.T) {
 * Must return response code 200
  */
 func TestAdminTenants(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/admin/tenants", nil, adminAccessToken)
 
@@ -805,7 +757,7 @@ func TestAdminTenants(t *testing.T) {
 * Must return response code 401
  */
 func TestAdminTokenOnTenantRoute(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/articles", nil, adminAccessToken)
 	require.Equal(t, http.StatusUnauthorized, resp.Code)
@@ -818,7 +770,7 @@ func TestAdminTokenOnTenantRoute(t *testing.T) {
 * Must return response code 401
  */
 func TestUserTokenOnAdminRoute(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/admin/tenants", nil, accessTokenB)
 	require.Equal(t, http.StatusUnauthorized, resp.Code)
@@ -831,7 +783,7 @@ func TestUserTokenOnAdminRoute(t *testing.T) {
 * Must return response code 200
  */
 func TestAdminSuspendTenant(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	body := map[string]int16{"status": 0}
 	resp := doRequest(testRouter, "POST", fmt.Sprintf("/v1/admin/tenants/%s/status", tenantIDB), body, adminAccessToken)
@@ -845,7 +797,7 @@ func TestAdminSuspendTenant(t *testing.T) {
 * Must return response code 403
  */
 func TestSuspendedTenantLogin(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
 	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
@@ -859,7 +811,7 @@ func TestSuspendedTenantLogin(t *testing.T) {
 * Must return response code 401
  */
 func TestSuspendedTenantRefresh(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	tokenForm := forms.Token{RefreshToken: refreshTokenB}
 	resp := doRequest(testRouter, "POST", "/v1/token/refresh", tokenForm, "")
@@ -873,7 +825,7 @@ func TestSuspendedTenantRefresh(t *testing.T) {
 * Must return response code 200
  */
 func TestAdminReactivateTenant(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	body := map[string]int16{"status": 1}
 	resp := doRequest(testRouter, "POST", fmt.Sprintf("/v1/admin/tenants/%s/status", tenantIDB), body, adminAccessToken)
@@ -891,7 +843,7 @@ func TestAdminReactivateTenant(t *testing.T) {
 * Must return response code 200, then the token is dead.
  */
 func TestAdminLogout(t *testing.T) {
-	testRouter := SetupRouter()
+	testRouter := testRouter()
 
 	resp := doRequest(testRouter, "GET", "/v1/admin/logout", nil, adminAccessToken)
 	require.Equal(t, http.StatusOK, resp.Code)
@@ -920,20 +872,20 @@ func TestCleanUp(t *testing.T) {
 	require.NoError(t, err)
 
 	// Flush this suite's Redis keys: tenant session index sets and admin keys.
-	if indexKeys, err := db.GetRedis().Keys("user_sessions:*").Result(); err == nil {
+	if indexKeys, err := redisdb.GetRedis().Keys("user_sessions:*").Result(); err == nil {
 		for _, indexKey := range indexKeys {
-			if members, err := db.GetRedis().SMembers(indexKey).Result(); err == nil {
+			if members, err := redisdb.GetRedis().SMembers(indexKey).Result(); err == nil {
 				if len(members) > 0 {
-					db.GetRedis().Del(members...)
+					redisdb.GetRedis().Del(members...)
 				}
 			}
-			db.GetRedis().Del(indexKey)
+			redisdb.GetRedis().Del(indexKey)
 		}
 	}
-	if keys, err := db.GetRedis().Keys("admin:*").Result(); err == nil && len(keys) > 0 {
-		db.GetRedis().Del(keys...)
+	if keys, err := redisdb.GetRedis().Keys("admin:*").Result(); err == nil && len(keys) > 0 {
+		redisdb.GetRedis().Del(keys...)
 	}
-	db.GetRedis().Del(accessTokenB, refreshTokenB)
+	redisdb.GetRedis().Del(accessTokenB, refreshTokenB)
 
 	// Let the environment settle before the process exits.
 	_ = time.Now()

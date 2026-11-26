@@ -5,7 +5,7 @@ package mocks
 import (
 	context "context"
 
-	db "github.com/Massad/gin-boilerplate/internal/db"
+	db "github.com/Massad/gin-boilerplate/internal/platform/db"
 	mock "github.com/stretchr/testify/mock"
 
 	uuid "github.com/google/uuid"

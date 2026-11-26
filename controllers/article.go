@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/google/uuid"
 
@@ -35,7 +36,7 @@ func (ctrl ArticleController) Create(c *gin.Context) {
 	var form forms.CreateArticleForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
-		message := forms.Translate(validationErr, forms.ArticleMessages)
+		message := validate.Translate(validationErr, forms.ArticleMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
@@ -129,7 +130,7 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 	var form forms.CreateArticleForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
-		message := forms.Translate(validationErr, forms.ArticleMessages)
+		message := validate.Translate(validationErr, forms.ArticleMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}

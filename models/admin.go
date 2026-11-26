@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"

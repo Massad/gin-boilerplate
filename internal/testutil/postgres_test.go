@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 )
 
 // TestEphemeralPostgresMigrationsAndFixtures exercises the disposable instance

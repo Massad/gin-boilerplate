@@ -1,5 +1,9 @@
 package forms
 
+import (
+	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
+)
+
 // LoginForm ...
 type LoginForm struct {
 	Email    string `form:"email" json:"email" binding:"required,email"`
@@ -15,7 +19,7 @@ type RegisterForm struct {
 }
 
 // LoginMessages defines validation error messages for login form.
-var LoginMessages = ValidationMessages{
+var LoginMessages = validate.ValidationMessages{
 	"Email": {
 		"required": "Please enter your email",
 		"email":    "Please enter a valid email",
@@ -29,7 +33,7 @@ var LoginMessages = ValidationMessages{
 }
 
 // RegisterMessages defines validation error messages for register form.
-var RegisterMessages = ValidationMessages{
+var RegisterMessages = validate.ValidationMessages{
 	"Name": {
 		"required": "Please enter your name",
 		"min":      "Your name should be between 3 to 20 characters",

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Massad/gin-boilerplate/db"
-	pgdb "github.com/Massad/gin-boilerplate/internal/db"
+	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
+	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
@@ -31,10 +31,10 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	t.Setenv("ACCESS_SECRET", "access-key-for-isolated-tests-only-32-bytes")
 	t.Setenv("REFRESH_SECRET", "refresh-key-for-isolated-tests-only-32-bytes")
 	gin.SetMode(gin.TestMode)
-	require.NoError(t, db.InitRedis(), "resolving the Redis database index")
-	require.Equal(t, 2, db.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
-	t.Cleanup(func() { _ = db.GetRedis().Close() })
-	require.NoError(t, db.GetRedis().Ping().Err())
+	require.NoError(t, redisdb.InitRedis(), "resolving the Redis database index")
+	require.Equal(t, 2, redisdb.GetRedis().Options().DB, "the suite must run on the disposable Redis index 2")
+	t.Cleanup(func() { _ = redisdb.GetRedis().Close() })
+	require.NoError(t, redisdb.GetRedis().Ping().Err())
 	require.NoError(t, pgdb.InitTenant(context.Background(), os.Getenv), "initializing the tenant pool: if the error says the database does not exist, run make test once to provision artisan_test; never falls back to the dev database")
 	require.NoError(t, pgdb.InitAdmin(context.Background(), os.Getenv), "initializing the admin pool: if the error says the database does not exist, run make test once to provision artisan_test; never falls back to the dev database")
 	var suiteDB string
@@ -67,7 +67,7 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	// the given owner.
 	seedRefresh := func(keyValue string, claimed uuid.UUID, suspended bool) (string, string) {
 		id := uuid.NewString()
-		require.NoError(t, db.GetRedis().Set(id, keyValue, time.Minute).Err())
+		require.NoError(t, redisdb.GetRedis().Set(id, keyValue, time.Minute).Err())
 		if suspended {
 			_, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=0 WHERE id=$1", tenant.ID)
 			require.NoError(t, err)
@@ -106,11 +106,11 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 			}
 			suspended := tc.name == "suspended tenant"
 			id, token := seedRefresh(tc.keyValue, tc.claimed, suspended)
-			t.Cleanup(func() { db.GetRedis().Del(id) })
+			t.Cleanup(func() { redisdb.GetRedis().Del(id) })
 
 			w := refresh(token)
 			require.Equal(t, tc.wantStatus, w.Code, "refresh status mismatch")
-			remaining, err := db.GetRedis().Exists(id).Result()
+			remaining, err := redisdb.GetRedis().Exists(id).Result()
 			require.NoError(t, err)
 			wantRemaining := int64(0)
 			if tc.name == "owner mismatch" {
@@ -128,7 +128,7 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 				})
 				require.NoError(t, err)
 				claims := accessJWT.Claims.(jwt.MapClaims)
-				db.GetRedis().Del(claims["access_uuid"].(string))
+				redisdb.GetRedis().Del(claims["access_uuid"].(string))
 				require.Equal(t, owner.String(), claims["user_id"], "claim user_id must carry the fresh owner identity")
 				require.Equal(t, tenant.ID.String(), claims["tenant_id"], "claim tenant_id must carry the fresh owner identity")
 				require.Equal(t, "owner", claims["role"], "claim role must carry the fresh owner identity")
@@ -137,7 +137,7 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 				})
 				require.NoError(t, err)
 				refreshClaims := refreshJWT.Claims.(jwt.MapClaims)
-				db.GetRedis().Del(refreshClaims["refresh_uuid"].(string))
+				redisdb.GetRedis().Del(refreshClaims["refresh_uuid"].(string))
 				replay := refresh(token)
 				require.Equal(t, http.StatusUnauthorized, replay.Code, "replay status must be unauthorized")
 			}
