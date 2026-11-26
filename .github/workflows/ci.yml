@@ -136,12 +136,14 @@ jobs:
             exit 1
           fi
           for encoding in identity gzip; do
-            for path in / /swagger/index.html /swagger/doc.json /swagger/swagger-initializer.js /swagger/swagger-ui.css /swagger/swagger-ui-bundle.js /v1/articles; do
+            # The swagger UI is a non-production surface (mounted only when
+            # ENV != PRODUCTION): the production smoke probes the demo shell
+            # and the API guard only.
+            for path in / /v1/articles; do
               status=$(curl --compressed --silent --show-error --connect-timeout 2 --max-time 10 \
                 -H "Accept-Encoding: $encoding" -D "$smoke_dir/headers" -o "$smoke_dir/body" \
                 --write-out '%{http_code}' "http://127.0.0.1:9000$path")
               python3 - "$path" "$status" "$encoding" <<'PY'
-          import json
           import os
           from pathlib import Path
           import sys
@@ -154,17 +156,10 @@ jobs:
           assert status == expected, (route, status, expected)
           fragments = {
               "/": b"Gin Boilerplate",
-              "/swagger/index.html": b"swagger-ui",
-              "/swagger/swagger-initializer.js": b"SwaggerUIBundle",
-              "/swagger/swagger-ui.css": b".swagger-ui",
-              "/swagger/swagger-ui-bundle.js": b"SwaggerUIBundle",
               "/v1/articles": b"Please login first",
           }
           if route in fragments:
               assert fragments[route] in body, (route, "unexpected body")
-          if route == "/swagger/doc.json":
-              document = json.loads(body)
-              assert document["swagger"] == "2.0" and document["paths"], "invalid Swagger document"
           if encoding == "gzip" and route == "/":
               assert "content-encoding: gzip" in headers, "gzip response missing"
           if encoding == "identity":
