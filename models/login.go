@@ -4,15 +4,16 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/Massad/gin-boilerplate/internal/modules/admin"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// MessageResponse is the shared message-only payload of the remaining root
-// controllers (it leaves with the admin module in Phase 6 or the unified
-// login in Phase 7).
+// MessageResponse is the shared message-only payload still referenced by the
+// admin module and auth-controller Swagger annotations (it leaves with the
+// unified login in Phase 7).
 type MessageResponse struct {
 	Message string `json:"message"`
 }
@@ -54,7 +55,7 @@ type UnifiedLoginResult struct {
 	Tenant user.TenantPayload
 	Token  auth.Token
 	// Admin and AccessToken are set when Kind is LoginKindSuperadmin.
-	Admin       AdminIdentity
+	Admin       admin.AdminIdentity
 	AccessToken string
 }
 
@@ -64,11 +65,11 @@ type UnifiedLoginResult struct {
 // populates admin and a single long-lived access token (8h, no refresh — the
 // refresh_token key is then absent from the payload).
 type UnifiedLoginResponse struct {
-	Kind   LoginKind          `json:"kind"`
-	User   user.User          `json:"user,omitempty"`
-	Tenant user.TenantPayload `json:"tenant,omitempty"`
-	Admin  AdminIdentity      `json:"admin,omitempty"`
-	Token  auth.Token         `json:"token"`
+	Kind   LoginKind           `json:"kind"`
+	User   user.User           `json:"user,omitempty"`
+	Tenant user.TenantPayload  `json:"tenant,omitempty"`
+	Admin  admin.AdminIdentity `json:"admin,omitempty"`
+	Token  auth.Token          `json:"token"`
 }
 
 // UnifiedLogin authenticates against the tenant directory first and falls back
@@ -85,7 +86,7 @@ type UnifiedLoginResponse struct {
 // The no-overlap policy is explicit: a superadmin email must never match a
 // tenant user email, so the two directories are never probed for the same
 // account.
-func UnifiedLogin(svc *auth.Service, users *user.Service, form user.LoginForm) (UnifiedLoginResult, error) {
+func UnifiedLogin(svc *auth.Service, users *user.Service, admins *admin.Service, form user.LoginForm) (UnifiedLoginResult, error) {
 	usr, tenantPayload, token, userErr := users.Login(form)
 	switch {
 	case userErr == nil:
@@ -107,7 +108,7 @@ func UnifiedLogin(svc *auth.Service, users *user.Service, form user.LoginForm) (
 	dummyHashComparisons.Add(1)
 	_ = bcrypt.CompareHashAndPassword([]byte(dummyPasswordHash), []byte(form.Password))
 
-	admin, adminErr := (AdminModel{}).Login(form.Email, form.Password)
+	admin, adminErr := admins.Login(form.Email, form.Password)
 	if adminErr != nil {
 		return UnifiedLoginResult{}, ErrInvalidCredentials
 	}

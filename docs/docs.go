@@ -44,7 +44,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/user.LoginForm"
+                            "$ref": "#/definitions/admin.LoginForm"
                         }
                     }
                 ],
@@ -52,7 +52,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/auth.AuthResponse"
+                            "$ref": "#/definitions/auth.AdminToken"
                         }
                     },
                     "406": {
@@ -133,7 +133,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/forms.TenantStatusForm"
+                            "$ref": "#/definitions/admin.TenantStatusForm"
                         }
                     }
                 ],
@@ -519,6 +519,52 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "admin.AdminIdentity": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "admin.LoginForm": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
+                }
+            }
+        },
+        "admin.TenantStatusForm": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "type": "integer",
+                    "enum": [
+                        0,
+                        1
+                    ]
+                }
+            }
+        },
         "article.AllArticleResponse": {
             "type": "object",
             "properties": {
@@ -616,6 +662,14 @@ const docTemplate = `{
                 }
             }
         },
+        "auth.AdminToken": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                }
+            }
+        },
         "auth.AuthResponse": {
             "type": "object",
             "properties": {
@@ -638,21 +692,6 @@ const docTemplate = `{
                 }
             }
         },
-        "forms.TenantStatusForm": {
-            "type": "object",
-            "required": [
-                "status"
-            ],
-            "properties": {
-                "status": {
-                    "type": "integer",
-                    "enum": [
-                        0,
-                        1
-                    ]
-                }
-            }
-        },
         "forms.Token": {
             "type": "object",
             "required": [
@@ -660,20 +699,6 @@ const docTemplate = `{
             ],
             "properties": {
                 "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.AdminIdentity": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
                     "type": "string"
                 }
             }
@@ -701,7 +726,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "admin": {
-                    "$ref": "#/definitions/models.AdminIdentity"
+                    "$ref": "#/definitions/admin.AdminIdentity"
                 },
                 "kind": {
                     "$ref": "#/definitions/models.LoginKind"

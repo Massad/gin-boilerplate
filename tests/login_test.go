@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/Massad/gin-boilerplate/internal/modules/admin"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
@@ -105,8 +106,11 @@ func TestUnifiedLoginSuperadmin(t *testing.T) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	require.NoError(t, err)
 	// The admin fixture stays until TestUnifiedLoginCleanUp: the legacy
-	// endpoint tests below reuse it.
-	_, err = (models.AdminModel{}).Create(email, string(hashed), "Laure Moreau")
+	// endpoint tests below reuse it. The superadmin upsert flows through the
+	// admin module service (nil ports: the bootstrap never issues tokens,
+	// lists tenants or opens a unit of work).
+	admins := admin.NewService(admin.NewRepository(pgdb.AdminStore()), nil, nil, nil)
+	_, err = admins.Create(email, string(hashed), "Laure Moreau")
 	require.NoError(t, err)
 
 	resp := doRequest(testRouter, "POST", "/v1/login", user.LoginForm{Email: email, Password: password}, "")

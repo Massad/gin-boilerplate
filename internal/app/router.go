@@ -11,6 +11,7 @@ import (
 
 	"github.com/Massad/gin-boilerplate/controllers"
 	_ "github.com/Massad/gin-boilerplate/docs"
+	"github.com/Massad/gin-boilerplate/internal/modules/admin"
 	"github.com/Massad/gin-boilerplate/internal/modules/article"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/Massad/gin-boilerplate/internal/modules/tenant"
@@ -19,7 +20,6 @@ import (
 	platformmw "github.com/Massad/gin-boilerplate/internal/platform/middleware"
 	redisdb "github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
-	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -89,8 +89,25 @@ func NewRouter(deps Deps) *gin.Engine {
 		v1.POST("/user/register", userHandler.Register)
 		v1.GET("/user/logout", auth.TokenAuth(authSvc), authHandler.UserLogout)
 
+		/*** START ADMIN ***/
+		// Composition root of the admin module: the platform store is
+		// resolved here for the transitory window (dette tracée pour
+		// post-Phase 8 : singletons prohibés hors composition root). The
+		// section sits before the unified-auth block because the unified
+		// login consumes the admin service in its superadmin fallback.
+		admins := admin.NewService(admin.NewRepository(pgdb.AdminStore()), tenants, authSvc, pgdb.AdminStore())
+		adminHandler := admin.NewHandler(admins, authSvc)
+
+		v1.POST("/admin/login", adminHandler.Login)
+		adminAPI := v1.Group("/admin", auth.AdminAuth(authSvc))
+		{
+			adminAPI.GET("/logout", authHandler.AdminLogout)
+			adminAPI.GET("/tenants", adminHandler.Tenants)
+			adminAPI.POST("/tenants/:id/status", adminHandler.SetTenantStatus)
+		}
+
 		/*** START AUTH ***/
-		authController := controllers.NewAuthController(authSvc, users)
+		authController := controllers.NewAuthController(authSvc, users, admins)
 
 		v1.POST("/login", authController.Login)
 		v1.POST("/token/refresh", authController.Refresh)
@@ -104,17 +121,6 @@ func NewRouter(deps Deps) *gin.Engine {
 		v1.GET("/article/:id", auth.TokenAuth(authSvc), articleHandler.One)
 		v1.PUT("/article/:id", auth.TokenAuth(authSvc), articleHandler.Update)
 		v1.DELETE("/article/:id", auth.TokenAuth(authSvc), articleHandler.Delete)
-
-		/*** START ADMIN ***/
-		admin := controllers.NewAdminController(authSvc, models.NewAdminModel(tenants))
-
-		v1.POST("/admin/login", admin.Login)
-		adminAPI := v1.Group("/admin", auth.AdminAuth(authSvc))
-		{
-			adminAPI.GET("/logout", authHandler.AdminLogout)
-			adminAPI.GET("/tenants", admin.Tenants)
-			adminAPI.POST("/tenants/:id/status", admin.SetTenantStatus)
-		}
 	}
 
 	if deps.Env != "PRODUCTION" {

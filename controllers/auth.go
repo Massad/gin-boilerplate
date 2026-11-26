@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/Massad/gin-boilerplate/internal/modules/admin"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 
@@ -26,12 +27,15 @@ type AuthController struct {
 	// the unified login runs its Login and the refresh flow re-reads the
 	// user through OneWithTenant.
 	users *user.Service
+	// admins is the admin module service injected at the composition root:
+	// the unified login runs its superadmin fallback through it.
+	admins *admin.Service
 }
 
-// NewAuthController builds the controller on the injected session service
-// and user service.
-func NewAuthController(svc *auth.Service, users *user.Service) *AuthController {
-	return &AuthController{auth: svc, users: users}
+// NewAuthController builds the controller on the injected auth, user and
+// admin services.
+func NewAuthController(svc *auth.Service, users *user.Service, admins *admin.Service) *AuthController {
+	return &AuthController{auth: svc, users: users, admins: admins}
 }
 
 // Login Unified godoc
@@ -56,7 +60,7 @@ func (ctl AuthController) Login(c *gin.Context) {
 		return
 	}
 
-	result, err := models.UnifiedLogin(ctl.auth, ctl.users, loginForm)
+	result, err := models.UnifiedLogin(ctl.auth, ctl.users, ctl.admins, loginForm)
 	if err != nil {
 		if errors.Is(err, user.ErrTenantSuspended) {
 			// A suspended tenant stays observable: the 403 is not masked.

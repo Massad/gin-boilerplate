@@ -1,5 +1,36 @@
 basePath: /v1
 definitions:
+  admin.AdminIdentity:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  admin.LoginForm:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  admin.TenantStatusForm:
+    properties:
+      status:
+        enum:
+        - 0
+        - 1
+        type: integer
+    required:
+    - status
+    type: object
   article.AllArticleResponse:
     properties:
       results:
@@ -64,6 +95,11 @@ definitions:
       name:
         type: string
     type: object
+  auth.AdminToken:
+    properties:
+      access_token:
+        type: string
+    type: object
   auth.AuthResponse:
     properties:
       access_token:
@@ -78,31 +114,12 @@ definitions:
       refresh_token:
         type: string
     type: object
-  forms.TenantStatusForm:
-    properties:
-      status:
-        enum:
-        - 0
-        - 1
-        type: integer
-    required:
-    - status
-    type: object
   forms.Token:
     properties:
       refresh_token:
         type: string
     required:
     - refresh_token
-    type: object
-  models.AdminIdentity:
-    properties:
-      email:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
     type: object
   models.LoginKind:
     enum:
@@ -120,7 +137,7 @@ definitions:
   models.UnifiedLoginResponse:
     properties:
       admin:
-        $ref: '#/definitions/models.AdminIdentity'
+        $ref: '#/definitions/admin.AdminIdentity'
       kind:
         $ref: '#/definitions/models.LoginKind'
       tenant:
@@ -244,14 +261,14 @@ paths:
         name: auth
         required: true
         schema:
-          $ref: '#/definitions/user.LoginForm'
+          $ref: '#/definitions/admin.LoginForm'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/auth.AuthResponse'
+            $ref: '#/definitions/auth.AdminToken'
         "406":
           description: Not Acceptable
           schema:
@@ -302,7 +319,7 @@ paths:
         name: status
         required: true
         schema:
-          $ref: '#/definitions/forms.TenantStatusForm'
+          $ref: '#/definitions/admin.TenantStatusForm'
       produces:
       - application/json
       responses:

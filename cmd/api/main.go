@@ -12,11 +12,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Massad/gin-boilerplate/internal/app"
+	"github.com/Massad/gin-boilerplate/internal/modules/admin"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/Massad/gin-boilerplate/internal/platform/config"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
-	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
-	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -60,7 +60,11 @@ func runCreateAdmin(ctx context.Context, getenv func(string) string, email, pass
 	if err != nil {
 		return err
 	}
-	if _, err := (models.AdminModel{}).Create(email, string(hashed), displayName); err != nil {
+	// The bootstrap drives the superadmin upsert only: it never issues
+	// tokens, lists tenants or opens a unit of work (nil ports — covered by
+	// cmd/api/main_test.go).
+	admins := admin.NewService(admin.NewRepository(pgdb.AdminStore()), nil, nil, nil)
+	if _, err := admins.Create(email, string(hashed), displayName); err != nil {
 		return err
 	}
 	fmt.Printf("Superadmin %s created\n", strings.ToLower(strings.TrimSpace(email)))

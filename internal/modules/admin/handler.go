@@ -1,33 +1,27 @@
-package controllers
+package admin
 
 import (
 	"net/http"
 
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
-	// Blank import keeping tenant.AllTenantResponse resolvable for the Tenants
-	// swagger annotation (the type lives in the tenant module since Phase 4).
-	_ "github.com/Massad/gin-boilerplate/internal/modules/tenant"
-	user "github.com/Massad/gin-boilerplate/internal/modules/user"
-
-	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/platform/validate"
-	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// AdminController serves the backoffice handlers during the transitory
-// migration window: the model moves into the admin module in Phase 6.
-type AdminController struct {
-	auth  *auth.Service
-	admin models.AdminModel
+// Handler serves the backoffice handlers (the admin login is public, the
+// tenants/status routes sit behind AdminAuth). The token issuance flows
+// through the TokenService port declared by the module: the implementation
+// *auth.Service is injected at the composition root.
+type Handler struct {
+	admins *Service
+	tokens TokenService
 }
 
-// NewAdminController builds the controller on the injected session service
-// and the admin model (which consumes the tenant reader at the composition
-// root).
-func NewAdminController(svc *auth.Service, admin models.AdminModel) *AdminController {
-	return &AdminController{auth: svc, admin: admin}
+// NewHandler builds the admin handlers on the injected service and token
+// service.
+func NewHandler(admins *Service, tokens TokenService) Handler {
+	return Handler{admins: admins, tokens: tokens}
 }
 
 // Login Admin godoc
@@ -37,31 +31,31 @@ func NewAdminController(svc *auth.Service, admin models.AdminModel) *AdminContro
 // @Tags Admin
 // @Accept json
 // @Produce json
-// @Param auth body user.LoginForm true "Admin"
-// @Success 	 200  {object}  auth.AuthResponse
+// @Param auth body admin.LoginForm true "Admin"
+// @Success 	 200  {object}  auth.AdminToken
 // @Failure      406  {object}  models.MessageResponse
 // @Router /admin/login [post]
-func (ctl AdminController) Login(c *gin.Context) {
-	var loginForm user.LoginForm
+func (h Handler) Login(c *gin.Context) {
+	var loginForm LoginForm
 
 	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
-		message := validate.Translate(validationErr, user.LoginMessages)
+		message := validate.Translate(validationErr, LoginMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
 
-	admin, err := ctl.admin.Login(loginForm.Email, loginForm.Password)
+	admin, err := h.admins.Login(loginForm.Email, loginForm.Password)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid admin login details"})
 		return
 	}
 
-	tokenDetails, err := ctl.auth.CreateAdminToken(admin.ID)
+	tokenDetails, err := h.tokens.CreateAdminToken(admin.ID)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Invalid admin login details"})
 		return
 	}
-	if err := ctl.auth.CreateAdminAuth(admin.ID, tokenDetails); err != nil {
+	if err := h.tokens.CreateAdminAuth(admin.ID, tokenDetails); err != nil {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Invalid admin login details"})
 		return
 	}
@@ -78,8 +72,8 @@ func (ctl AdminController) Login(c *gin.Context) {
 // @Success 	 200  {object}  tenant.AllTenantResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /admin/tenants [get]
-func (ctl AdminController) Tenants(c *gin.Context) {
-	tenants, err := ctl.admin.AllTenants()
+func (h Handler) Tenants(c *gin.Context) {
+	tenants, err := h.admins.AllTenants()
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Could not list tenants"})
 		return
@@ -95,11 +89,11 @@ func (ctl AdminController) Tenants(c *gin.Context) {
 // @Tags Admin
 // @Accept json
 // @Produce json
-// @Param status body forms.TenantStatusForm true "Status"
+// @Param status body admin.TenantStatusForm true "Status"
 // @Success 	 200  {object}  models.MessageResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /admin/tenants/{id}/status [post]
-func (ctl AdminController) SetTenantStatus(c *gin.Context) {
+func (h Handler) SetTenantStatus(c *gin.Context) {
 	adminID, _ := uuid.Parse(c.GetString("adminID"))
 
 	id := c.Param("id")
@@ -110,15 +104,15 @@ func (ctl AdminController) SetTenantStatus(c *gin.Context) {
 		return
 	}
 
-	var form forms.TenantStatusForm
+	var form TenantStatusForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
-		message := validate.Translate(validationErr, forms.AdminStatusMessages)
+		message := validate.Translate(validationErr, AdminStatusMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
 
-	if err := ctl.admin.SetTenantStatus(adminID, tenantID, *form.Status); err != nil {
+	if err := h.admins.SetTenantStatus(adminID, tenantID, *form.Status); err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Tenant status could not be updated"})
 		return
 	}
