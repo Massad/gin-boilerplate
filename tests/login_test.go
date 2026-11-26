@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Massad/gin-boilerplate/forms"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
@@ -44,7 +44,7 @@ func TestUnifiedLoginTenantUser(t *testing.T) {
 	testRouter := testRouter()
 
 	_, form := testutil.NewUserFixture(t)
-	resp := doRequest(testRouter, "POST", "/v1/user/register", forms.RegisterForm{
+	resp := doRequest(testRouter, "POST", "/v1/user/register", user.RegisterForm{
 		Name:     form.Name,
 		Email:    form.Email,
 		Password: form.Password,
@@ -55,14 +55,14 @@ func TestUnifiedLoginTenantUser(t *testing.T) {
 	unifiedEmail = form.Email
 	unifiedPassword = form.Password
 
-	resp = doRequest(testRouter, "POST", "/v1/login", forms.LoginForm{Email: unifiedEmail, Password: unifiedPassword}, "")
+	resp = doRequest(testRouter, "POST", "/v1/login", user.LoginForm{Email: unifiedEmail, Password: unifiedPassword}, "")
 	require.Equal(t, http.StatusOK, resp.Code)
 
 	var res struct {
-		Kind   string               `json:"kind"`
-		User   models.User          `json:"user"`
-		Tenant models.TenantPayload `json:"tenant"`
-		Token  auth.Token          `json:"token"`
+		Kind   string             `json:"kind"`
+		User   user.User          `json:"user"`
+		Tenant user.TenantPayload `json:"tenant"`
+		Token  auth.Token         `json:"token"`
 	}
 	decode(t, resp, &res)
 
@@ -109,7 +109,7 @@ func TestUnifiedLoginSuperadmin(t *testing.T) {
 	_, err = (models.AdminModel{}).Create(email, string(hashed), "Laure Moreau")
 	require.NoError(t, err)
 
-	resp := doRequest(testRouter, "POST", "/v1/login", forms.LoginForm{Email: email, Password: password}, "")
+	resp := doRequest(testRouter, "POST", "/v1/login", user.LoginForm{Email: email, Password: password}, "")
 	require.Equal(t, http.StatusOK, resp.Code)
 
 	var res struct {
@@ -152,7 +152,7 @@ func TestUnifiedLoginSuperadmin(t *testing.T) {
 func TestUnifiedLoginWrongPassword(t *testing.T) {
 	testRouter := testRouter()
 
-	resp := doRequest(testRouter, "POST", "/v1/login", forms.LoginForm{Email: unifiedEmail, Password: unifiedPassword + "-wrong"}, "")
+	resp := doRequest(testRouter, "POST", "/v1/login", user.LoginForm{Email: unifiedEmail, Password: unifiedPassword + "-wrong"}, "")
 	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 
 	var res struct {
@@ -162,7 +162,7 @@ func TestUnifiedLoginWrongPassword(t *testing.T) {
 	require.Equal(t, "Invalid login details", res.Message)
 
 	// The same generic failure applies to a superadmin email.
-	resp = doRequest(testRouter, "POST", "/v1/login", forms.LoginForm{Email: unifiedAdminEmail, Password: unifiedAdminPassword + "-wrong"}, "")
+	resp = doRequest(testRouter, "POST", "/v1/login", user.LoginForm{Email: unifiedAdminEmail, Password: unifiedAdminPassword + "-wrong"}, "")
 	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 }
 
@@ -177,7 +177,7 @@ func TestUnifiedLoginUnknownEmail(t *testing.T) {
 	testRouter := testRouter()
 
 	before := models.DummyHashComparisons()
-	resp := doRequest(testRouter, "POST", "/v1/login", forms.LoginForm{Email: "nobody-gin-boilerplate@test.com", Password: unifiedPassword}, "")
+	resp := doRequest(testRouter, "POST", "/v1/login", user.LoginForm{Email: "nobody-gin-boilerplate@test.com", Password: unifiedPassword}, "")
 	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 	require.Greater(t, models.DummyHashComparisons(), before, "the unknown-email path must run the dummy bcrypt (timing equalization)")
 
@@ -200,7 +200,7 @@ func TestUnifiedLoginSuspendedTenant(t *testing.T) {
 	_, err := pgdb.AdminStore().Pool.Exec(context.Background(), "UPDATE tenant SET status=0 WHERE id=$1", unifiedTenantID)
 	require.NoError(t, err)
 
-	resp := doRequest(testRouter, "POST", "/v1/login", forms.LoginForm{Email: unifiedEmail, Password: unifiedPassword}, "")
+	resp := doRequest(testRouter, "POST", "/v1/login", user.LoginForm{Email: unifiedEmail, Password: unifiedPassword}, "")
 	require.Equal(t, http.StatusForbidden, resp.Code)
 
 	_, err = pgdb.AdminStore().Pool.Exec(context.Background(), "UPDATE tenant SET status=1 WHERE id=$1", unifiedTenantID)
@@ -209,14 +209,14 @@ func TestUnifiedLoginSuspendedTenant(t *testing.T) {
 
 /**
 * TestUnifiedLoginValidation
-* The unified endpoint binds forms.LoginForm and translates its messages.
+* The unified endpoint binds user.LoginForm and translates its messages.
 *
 * Must return response code 406
  */
 func TestUnifiedLoginValidation(t *testing.T) {
 	testRouter := testRouter()
 
-	resp := doRequest(testRouter, "POST", "/v1/login", forms.LoginForm{Email: "invalid@email", Password: unifiedPassword}, "")
+	resp := doRequest(testRouter, "POST", "/v1/login", user.LoginForm{Email: "invalid@email", Password: unifiedPassword}, "")
 	require.Equal(t, http.StatusNotAcceptable, resp.Code)
 
 	var res struct {
@@ -235,14 +235,14 @@ func TestUnifiedLoginValidation(t *testing.T) {
 func TestUnifiedLoginLegacyEndpoints(t *testing.T) {
 	testRouter := testRouter()
 
-	resp := doRequest(testRouter, "POST", "/v1/user/login", forms.LoginForm{Email: unifiedEmail, Password: unifiedPassword}, "")
+	resp := doRequest(testRouter, "POST", "/v1/user/login", user.LoginForm{Email: unifiedEmail, Password: unifiedPassword}, "")
 	require.Equal(t, http.StatusOK, resp.Code)
 	// The legacy tenant endpoint keeps its access/refresh pair.
 	userToken := tokenPayload(t, resp)
 	require.Contains(t, userToken, "access_token")
 	require.Contains(t, userToken, "refresh_token")
 
-	resp = doRequest(testRouter, "POST", "/v1/admin/login", forms.LoginForm{Email: unifiedAdminEmail, Password: unifiedAdminPassword}, "")
+	resp = doRequest(testRouter, "POST", "/v1/admin/login", user.LoginForm{Email: unifiedAdminEmail, Password: unifiedAdminPassword}, "")
 	require.Equal(t, http.StatusOK, resp.Code)
 	// The legacy admin endpoint keeps its access-token-only payload.
 	adminToken := tokenPayload(t, resp)

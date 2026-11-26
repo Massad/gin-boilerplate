@@ -44,7 +44,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/forms.LoginForm"
+                            "$ref": "#/definitions/user.LoginForm"
                         }
                     }
                 ],
@@ -342,7 +342,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/forms.LoginForm"
+                            "$ref": "#/definitions/user.LoginForm"
                         }
                     }
                 ],
@@ -428,7 +428,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/forms.LoginForm"
+                            "$ref": "#/definitions/user.LoginForm"
                         }
                     }
                 ],
@@ -436,7 +436,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.UserLoginResponse"
+                            "$ref": "#/definitions/user.UserLoginResponse"
                         }
                     },
                     "406": {
@@ -497,7 +497,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/forms.RegisterForm"
+                            "$ref": "#/definitions/user.RegisterForm"
                         }
                     }
                 ],
@@ -505,7 +505,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.UserLoginResponse"
+                            "$ref": "#/definitions/user.UserLoginResponse"
                         }
                     },
                     "406": {
@@ -638,52 +638,6 @@ const docTemplate = `{
                 }
             }
         },
-        "forms.LoginForm": {
-            "type": "object",
-            "required": [
-                "email",
-                "password"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "minLength": 3
-                }
-            }
-        },
-        "forms.RegisterForm": {
-            "type": "object",
-            "required": [
-                "company",
-                "email",
-                "name",
-                "password"
-            ],
-            "properties": {
-                "company": {
-                    "type": "string",
-                    "maxLength": 60,
-                    "minLength": 3
-                },
-                "email": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 20,
-                    "minLength": 3
-                },
-                "password": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "minLength": 3
-                }
-            }
-        },
         "forms.TenantStatusForm": {
             "type": "object",
             "required": [
@@ -743,20 +697,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.TenantPayload": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                }
-            }
-        },
         "models.UnifiedLoginResponse": {
             "type": "object",
             "properties": {
@@ -767,50 +707,13 @@ const docTemplate = `{
                     "$ref": "#/definitions/models.LoginKind"
                 },
                 "tenant": {
-                    "$ref": "#/definitions/models.TenantPayload"
+                    "$ref": "#/definitions/user.TenantPayload"
                 },
                 "token": {
                     "$ref": "#/definitions/auth.Token"
                 },
                 "user": {
-                    "$ref": "#/definitions/models.User"
-                }
-            }
-        },
-        "models.User": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                },
-                "tenant_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.UserLoginResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "tenant": {
-                    "$ref": "#/definitions/models.TenantPayload"
-                },
-                "token": {
-                    "$ref": "#/definitions/auth.Token"
-                },
-                "user": {
-                    "$ref": "#/definitions/models.User"
+                    "$ref": "#/definitions/user.User"
                 }
             }
         },
@@ -839,6 +742,103 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "integer"
+                }
+            }
+        },
+        "user.LoginForm": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
+                }
+            }
+        },
+        "user.RegisterForm": {
+            "type": "object",
+            "required": [
+                "company",
+                "email",
+                "name",
+                "password"
+            ],
+            "properties": {
+                "company": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "minLength": 3
+                },
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "minLength": 3
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
+                }
+            }
+        },
+        "user.TenantPayload": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.User": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.UserLoginResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "tenant": {
+                    "$ref": "#/definitions/user.TenantPayload"
+                },
+                "token": {
+                    "$ref": "#/definitions/auth.Token"
+                },
+                "user": {
+                    "$ref": "#/definitions/user.User"
                 }
             }
         }

@@ -18,8 +18,9 @@ import (
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/app"
-	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/Massad/gin-boilerplate/internal/modules/article"
+	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
@@ -139,7 +140,7 @@ func TestIntDB(t *testing.T) {
 func TestRegister(t *testing.T) {
 	testRouter := testRouter()
 
-	registerForm := forms.RegisterForm{
+	registerForm := user.RegisterForm{
 		Name:     "testing",
 		Email:    testEmail,
 		Password: testPassword,
@@ -180,7 +181,7 @@ func TestRegister(t *testing.T) {
 func TestRegisterReservedSlug(t *testing.T) {
 	testRouter := testRouter()
 
-	registerForm := forms.RegisterForm{
+	registerForm := user.RegisterForm{
 		Name:     "testing",
 		Email:    "reserved-slug@test.com",
 		Password: testPassword,
@@ -200,7 +201,7 @@ func TestRegisterReservedSlug(t *testing.T) {
 func TestRegisterDuplicateEmail(t *testing.T) {
 	testRouter := testRouter()
 
-	registerForm := forms.RegisterForm{
+	registerForm := user.RegisterForm{
 		Name:     "testing",
 		Email:    testEmail,
 		Password: testPassword,
@@ -220,7 +221,7 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 func TestRegisterInvalidEmail(t *testing.T) {
 	testRouter := testRouter()
 
-	registerForm := forms.RegisterForm{
+	registerForm := user.RegisterForm{
 		Name:     "testing",
 		Email:    "invalid@email",
 		Password: testPassword,
@@ -241,7 +242,7 @@ func TestRegisterInvalidEmail(t *testing.T) {
 func TestLogin(t *testing.T) {
 	testRouter := testRouter()
 
-	loginForm := forms.LoginForm{
+	loginForm := user.LoginForm{
 		Email:    testEmail,
 		Password: testPassword,
 	}
@@ -285,7 +286,7 @@ func TestLogin(t *testing.T) {
 func TestLoginUppercaseEmail(t *testing.T) {
 	testRouter := testRouter()
 
-	loginForm := forms.LoginForm{
+	loginForm := user.LoginForm{
 		Email:    strings.ToUpper(testEmail),
 		Password: testPassword,
 	}
@@ -303,7 +304,7 @@ func TestLoginUppercaseEmail(t *testing.T) {
 func TestInvalidLogin(t *testing.T) {
 	testRouter := testRouter()
 
-	loginForm := forms.LoginForm{
+	loginForm := user.LoginForm{
 		Email:    "wrong@email.com",
 		Password: testPassword,
 	}
@@ -464,7 +465,7 @@ func TestCrossTenantIsolation(t *testing.T) {
 	testRouter := testRouter()
 
 	// Register tenant B.
-	registerForm := forms.RegisterForm{
+	registerForm := user.RegisterForm{
 		Name:     "testingb",
 		Email:    testEmailB,
 		Password: testPassword,
@@ -484,7 +485,7 @@ func TestCrossTenantIsolation(t *testing.T) {
 	require.NotEmpty(t, tenantIDB)
 
 	// Login tenant B.
-	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
+	loginForm := user.LoginForm{Email: testEmailB, Password: testPassword}
 	resp = doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
 	var loginRes struct {
 		User struct {
@@ -701,7 +702,7 @@ func TestUserLogout(t *testing.T) {
 func TestAdminLogin(t *testing.T) {
 	testRouter := testRouter()
 
-	loginForm := forms.LoginForm{Email: testAdminEmail, Password: testAdminPassword}
+	loginForm := user.LoginForm{Email: testAdminEmail, Password: testAdminPassword}
 
 	resp := doRequest(testRouter, "POST", "/v1/admin/login", loginForm, "")
 
@@ -726,7 +727,7 @@ func TestAdminLogin(t *testing.T) {
 func TestAdminLoginWithUserCredentials(t *testing.T) {
 	testRouter := testRouter()
 
-	loginForm := forms.LoginForm{Email: testEmail, Password: testPassword}
+	loginForm := user.LoginForm{Email: testEmail, Password: testPassword}
 
 	resp := doRequest(testRouter, "POST", "/v1/admin/login", loginForm, "")
 	require.Equal(t, http.StatusNotAcceptable, resp.Code)
@@ -809,7 +810,7 @@ func TestAdminSuspendTenant(t *testing.T) {
 func TestSuspendedTenantLogin(t *testing.T) {
 	testRouter := testRouter()
 
-	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
+	loginForm := user.LoginForm{Email: testEmailB, Password: testPassword}
 	resp := doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
 	require.Equal(t, http.StatusForbidden, resp.Code)
 }
@@ -841,7 +842,7 @@ func TestAdminReactivateTenant(t *testing.T) {
 	resp := doRequest(testRouter, "POST", fmt.Sprintf("/v1/admin/tenants/%s/status", tenantIDB), body, adminAccessToken)
 	require.Equal(t, http.StatusOK, resp.Code)
 
-	loginForm := forms.LoginForm{Email: testEmailB, Password: testPassword}
+	loginForm := user.LoginForm{Email: testEmailB, Password: testPassword}
 	resp = doRequest(testRouter, "POST", "/v1/user/login", loginForm, "")
 	require.Equal(t, http.StatusOK, resp.Code)
 }

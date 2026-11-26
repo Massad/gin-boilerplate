@@ -7,6 +7,7 @@ import (
 	// Blank import keeping tenant.AllTenantResponse resolvable for the Tenants
 	// swagger annotation (the type lives in the tenant module since Phase 4).
 	_ "github.com/Massad/gin-boilerplate/internal/modules/tenant"
+	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/platform/validate"
@@ -36,15 +37,15 @@ func NewAdminController(svc *auth.Service, admin models.AdminModel) *AdminContro
 // @Tags Admin
 // @Accept json
 // @Produce json
-// @Param auth body forms.LoginForm true "Admin"
+// @Param auth body user.LoginForm true "Admin"
 // @Success 	 200  {object}  auth.AuthResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /admin/login [post]
 func (ctl AdminController) Login(c *gin.Context) {
-	var loginForm forms.LoginForm
+	var loginForm user.LoginForm
 
 	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
-		message := validate.Translate(validationErr, forms.LoginMessages)
+		message := validate.Translate(validationErr, user.LoginMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}

@@ -1,4 +1,4 @@
-package forms
+package user
 
 import (
 	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"

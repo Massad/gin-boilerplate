@@ -14,6 +14,8 @@ import (
 
 	"github.com/Massad/gin-boilerplate/controllers"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+	"github.com/Massad/gin-boilerplate/internal/modules/tenant"
+	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
@@ -60,22 +62,30 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 	ctx := context.Background()
 	testTenant := testutil.NewTenantFixture(t)
 	tenantUser, tenantForm := testutil.NewUserFixture(t)
-	tenant, err := pgdb.AdminStore().CreateTenant(ctx, pgdb.CreateTenantParams{Slug: testTenant.Slug, Name: testTenant.Name})
+	createdTenant, err := pgdb.AdminStore().CreateTenant(ctx, pgdb.CreateTenantParams{Slug: testTenant.Slug, Name: testTenant.Name})
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		pgdb.AdminStore().Pool.Exec(context.Background(), "DELETE FROM public.tenant WHERE id=$1", tenant.ID)
+		pgdb.AdminStore().Pool.Exec(context.Background(), "DELETE FROM public.tenant WHERE id=$1", createdTenant.ID)
 	})
 
 	owner, err := pgdb.AdminStore().CreateUserOwner(ctx, pgdb.CreateUserOwnerParams{
 		Email:    tenantForm.Email,
 		Password: tenantUser.Password,
 		Name:     tenantForm.Name,
-		TenantID: tenant.ID,
+		TenantID: createdTenant.ID,
 	})
 	require.NoError(t, err)
 
+	// The refresh route wires the user module service exactly like the
+	// composition root does: the flow re-reads the user through OneWithTenant.
+	users := user.NewService(
+		user.NewRepository(pgdb.AdminStore(), pgdb.TenantStore()),
+		tenant.NewRepository(pgdb.AdminStore()),
+		svc,
+		pgdb.AdminStore(),
+	)
 	r := gin.New()
-	r.POST("/refresh", controllers.NewAuthController(svc).Refresh)
+	r.POST("/refresh", controllers.NewAuthController(svc, users).Refresh)
 
 	// seedRefresh inserts the redis value and signs a refresh token claiming
 	// the given owner.
@@ -83,11 +93,11 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 		id := uuid.NewString()
 		require.NoError(t, redisdb.GetRedis().Set(id, keyValue, time.Minute).Err())
 		if suspended {
-			_, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=0 WHERE id=$1", tenant.ID)
+			_, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=0 WHERE id=$1", createdTenant.ID)
 			require.NoError(t, err)
 		}
 		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"refresh_uuid": id, "user_id": claimed.String(), "tenant_id": tenant.ID.String(), "exp": time.Now().Add(time.Minute).Unix(),
+			"refresh_uuid": id, "user_id": claimed.String(), "tenant_id": createdTenant.ID.String(), "exp": time.Now().Add(time.Minute).Unix(),
 		}).SignedString([]byte(os.Getenv("REFRESH_SECRET")))
 		require.NoError(t, err)
 		return id, token
@@ -108,14 +118,14 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 		claimed    uuid.UUID
 		wantStatus int
 	}{
-		{"owner mismatch", owner.String() + ":" + tenant.ID.String() + ":owner", uuid.New(), http.StatusUnauthorized},
-		{"suspended tenant", owner.String() + ":" + tenant.ID.String() + ":owner", owner, http.StatusUnauthorized},
-		{"matching owner", owner.String() + ":" + tenant.ID.String() + ":owner", owner, http.StatusOK},
+		{"owner mismatch", owner.String() + ":" + createdTenant.ID.String() + ":owner", uuid.New(), http.StatusUnauthorized},
+		{"suspended tenant", owner.String() + ":" + createdTenant.ID.String() + ":owner", owner, http.StatusUnauthorized},
+		{"matching owner", owner.String() + ":" + createdTenant.ID.String() + ":owner", owner, http.StatusOK},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.wantStatus == http.StatusOK {
 				// Only the successful case expects an active tenant.
-				_, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=1 WHERE id=$1", tenant.ID)
+				_, err := pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=1 WHERE id=$1", createdTenant.ID)
 				require.NoError(t, err)
 			}
 			suspended := tc.name == "suspended tenant"
@@ -144,7 +154,7 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 				claims := accessJWT.Claims.(jwt.MapClaims)
 				redisdb.GetRedis().Del(claims["access_uuid"].(string))
 				require.Equal(t, owner.String(), claims["user_id"], "claim user_id must carry the fresh owner identity")
-				require.Equal(t, tenant.ID.String(), claims["tenant_id"], "claim tenant_id must carry the fresh owner identity")
+				require.Equal(t, createdTenant.ID.String(), claims["tenant_id"], "claim tenant_id must carry the fresh owner identity")
 				require.Equal(t, "owner", claims["role"], "claim role must carry the fresh owner identity")
 				refreshJWT, err := jwt.Parse(result.RefreshToken, func(_ *jwt.Token) (interface{}, error) {
 					return []byte(os.Getenv("REFRESH_SECRET")), nil
@@ -156,7 +166,7 @@ func TestRefreshOnlyConsumesMatchingOwner(t *testing.T) {
 				require.Equal(t, http.StatusUnauthorized, replay.Code, "replay status must be unauthorized")
 			}
 			// Restore an active tenant for the remaining cases.
-			_, err = pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=1 WHERE id=$1", tenant.ID)
+			_, err = pgdb.AdminStore().Pool.Exec(ctx, "UPDATE public.tenant SET status=1 WHERE id=$1", createdTenant.ID)
 			require.NoError(t, err)
 		})
 	}

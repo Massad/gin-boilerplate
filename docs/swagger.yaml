@@ -78,40 +78,6 @@ definitions:
       refresh_token:
         type: string
     type: object
-  forms.LoginForm:
-    properties:
-      email:
-        type: string
-      password:
-        maxLength: 50
-        minLength: 3
-        type: string
-    required:
-    - email
-    - password
-    type: object
-  forms.RegisterForm:
-    properties:
-      company:
-        maxLength: 60
-        minLength: 3
-        type: string
-      email:
-        type: string
-      name:
-        maxLength: 20
-        minLength: 3
-        type: string
-      password:
-        maxLength: 50
-        minLength: 3
-        type: string
-    required:
-    - company
-    - email
-    - name
-    - password
-    type: object
   forms.TenantStatusForm:
     properties:
       status:
@@ -151,15 +117,6 @@ definitions:
       message:
         type: string
     type: object
-  models.TenantPayload:
-    properties:
-      id:
-        type: string
-      name:
-        type: string
-      slug:
-        type: string
-    type: object
   models.UnifiedLoginResponse:
     properties:
       admin:
@@ -167,35 +124,11 @@ definitions:
       kind:
         $ref: '#/definitions/models.LoginKind'
       tenant:
-        $ref: '#/definitions/models.TenantPayload'
+        $ref: '#/definitions/user.TenantPayload'
       token:
         $ref: '#/definitions/auth.Token'
       user:
-        $ref: '#/definitions/models.User'
-    type: object
-  models.User:
-    properties:
-      email:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-      role:
-        type: string
-      tenant_id:
-        type: string
-    type: object
-  models.UserLoginResponse:
-    properties:
-      message:
-        type: string
-      tenant:
-        $ref: '#/definitions/models.TenantPayload'
-      token:
-        $ref: '#/definitions/auth.Token'
-      user:
-        $ref: '#/definitions/models.User'
+        $ref: '#/definitions/user.User'
     type: object
   tenant.AllTenantResponse:
     properties:
@@ -214,6 +147,73 @@ definitions:
         type: string
       status:
         type: integer
+    type: object
+  user.LoginForm:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  user.RegisterForm:
+    properties:
+      company:
+        maxLength: 60
+        minLength: 3
+        type: string
+      email:
+        type: string
+      name:
+        maxLength: 20
+        minLength: 3
+        type: string
+      password:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - company
+    - email
+    - name
+    - password
+    type: object
+  user.TenantPayload:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+    type: object
+  user.User:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      tenant_id:
+        type: string
+    type: object
+  user.UserLoginResponse:
+    properties:
+      message:
+        type: string
+      tenant:
+        $ref: '#/definitions/user.TenantPayload'
+      token:
+        $ref: '#/definitions/auth.Token'
+      user:
+        $ref: '#/definitions/user.User'
     type: object
 externalDocs:
   description: OpenAPI
@@ -244,7 +244,7 @@ paths:
         name: auth
         required: true
         schema:
-          $ref: '#/definitions/forms.LoginForm'
+          $ref: '#/definitions/user.LoginForm'
       produces:
       - application/json
       responses:
@@ -441,7 +441,7 @@ paths:
         name: auth
         required: true
         schema:
-          $ref: '#/definitions/forms.LoginForm'
+          $ref: '#/definitions/user.LoginForm'
       produces:
       - application/json
       responses:
@@ -497,14 +497,14 @@ paths:
         name: article
         required: true
         schema:
-          $ref: '#/definitions/forms.LoginForm'
+          $ref: '#/definitions/user.LoginForm'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.UserLoginResponse'
+            $ref: '#/definitions/user.UserLoginResponse'
         "406":
           description: Not Acceptable
           schema:
@@ -542,14 +542,14 @@ paths:
         name: article
         required: true
         schema:
-          $ref: '#/definitions/forms.RegisterForm'
+          $ref: '#/definitions/user.RegisterForm'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.UserLoginResponse'
+            $ref: '#/definitions/user.UserLoginResponse'
         "406":
           description: Not Acceptable
           schema:

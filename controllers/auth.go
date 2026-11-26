@@ -7,6 +7,7 @@ import (
 	"os"
 
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/platform/validate"
@@ -21,11 +22,16 @@ import (
 // Phase 7.
 type AuthController struct {
 	auth *auth.Service
+	// users is the user module service injected at the composition root:
+	// the unified login runs its Login and the refresh flow re-reads the
+	// user through OneWithTenant.
+	users *user.Service
 }
 
-// NewAuthController builds the controller on the injected session service.
-func NewAuthController(svc *auth.Service) *AuthController {
-	return &AuthController{auth: svc}
+// NewAuthController builds the controller on the injected session service
+// and user service.
+func NewAuthController(svc *auth.Service, users *user.Service) *AuthController {
+	return &AuthController{auth: svc, users: users}
 }
 
 // Login Unified godoc
@@ -36,23 +42,23 @@ func NewAuthController(svc *auth.Service) *AuthController {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param auth body forms.LoginForm true "Auth"
+// @Param auth body user.LoginForm true "Auth"
 // @Success 	 200  {object}  models.UnifiedLoginResponse
 // @Failure      403  {object}  models.MessageResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /login [post]
 func (ctl AuthController) Login(c *gin.Context) {
-	var loginForm forms.LoginForm
+	var loginForm user.LoginForm
 
 	if validationErr := c.ShouldBindJSON(&loginForm); validationErr != nil {
-		message := validate.Translate(validationErr, forms.LoginMessages)
+		message := validate.Translate(validationErr, user.LoginMessages)
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
 		return
 	}
 
-	result, err := models.UnifiedLogin(ctl.auth, loginForm)
+	result, err := models.UnifiedLogin(ctl.auth, ctl.users, loginForm)
 	if err != nil {
-		if errors.Is(err, models.ErrTenantSuspended) {
+		if errors.Is(err, user.ErrTenantSuspended) {
 			// A suspended tenant stays observable: the 403 is not masked.
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"message": "Tenant suspended"})
 			return
@@ -146,7 +152,7 @@ func (ctl AuthController) Refresh(c *gin.Context) {
 
 	// Re-read the user through the platform pool: the role is never read back
 	// from the claims, the user must still exist and its tenant stay active.
-	row, readErr := userModel.OneWithTenant(userID)
+	row, readErr := ctl.users.OneWithTenant(userID)
 	if readErr != nil {
 		// The consumption delivered nothing: release the record so the
 		// replayed token stays recoverable during the grace.

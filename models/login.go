@@ -4,11 +4,18 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/Massad/gin-boilerplate/forms"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// MessageResponse is the shared message-only payload of the remaining root
+// controllers (it leaves with the admin module in Phase 6 or the unified
+// login in Phase 7).
+type MessageResponse struct {
+	Message string `json:"message"`
+}
 
 // LoginKind discriminates which directory authenticated a unified login.
 type LoginKind string
@@ -43,8 +50,8 @@ func DummyHashComparisons() int64 { return dummyHashComparisons.Load() }
 type UnifiedLoginResult struct {
 	Kind LoginKind
 	// User, Tenant and Token are set when Kind is LoginKindTenantUser.
-	User   User
-	Tenant TenantPayload
+	User   user.User
+	Tenant user.TenantPayload
 	Token  auth.Token
 	// Admin and AccessToken are set when Kind is LoginKindSuperadmin.
 	Admin       AdminIdentity
@@ -57,11 +64,11 @@ type UnifiedLoginResult struct {
 // populates admin and a single long-lived access token (8h, no refresh — the
 // refresh_token key is then absent from the payload).
 type UnifiedLoginResponse struct {
-	Kind   LoginKind     `json:"kind"`
-	User   User          `json:"user,omitempty"`
-	Tenant TenantPayload `json:"tenant,omitempty"`
-	Admin  AdminIdentity `json:"admin,omitempty"`
-	Token  auth.Token    `json:"token"`
+	Kind   LoginKind          `json:"kind"`
+	User   user.User          `json:"user,omitempty"`
+	Tenant user.TenantPayload `json:"tenant,omitempty"`
+	Admin  AdminIdentity      `json:"admin,omitempty"`
+	Token  auth.Token         `json:"token"`
 }
 
 // UnifiedLogin authenticates against the tenant directory first and falls back
@@ -78,12 +85,12 @@ type UnifiedLoginResponse struct {
 // The no-overlap policy is explicit: a superadmin email must never match a
 // tenant user email, so the two directories are never probed for the same
 // account.
-func UnifiedLogin(svc *auth.Service, form forms.LoginForm) (UnifiedLoginResult, error) {
-	user, tenant, token, userErr := (UserModel{auth: svc}).Login(form)
+func UnifiedLogin(svc *auth.Service, users *user.Service, form user.LoginForm) (UnifiedLoginResult, error) {
+	usr, tenantPayload, token, userErr := users.Login(form)
 	switch {
 	case userErr == nil:
-		return UnifiedLoginResult{Kind: LoginKindTenantUser, User: user, Tenant: tenant, Token: token}, nil
-	case errors.Is(userErr, ErrTenantSuspended):
+		return UnifiedLoginResult{Kind: LoginKindTenantUser, User: usr, Tenant: tenantPayload, Token: token}, nil
+	case errors.Is(userErr, user.ErrTenantSuspended):
 		return UnifiedLoginResult{}, userErr
 	case errors.Is(userErr, pgx.ErrNoRows):
 		// Unknown email: equalize the cost below, then try the superadmin

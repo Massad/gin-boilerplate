@@ -14,6 +14,7 @@ import (
 	"github.com/Massad/gin-boilerplate/internal/modules/article"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
 	"github.com/Massad/gin-boilerplate/internal/modules/tenant"
+	user "github.com/Massad/gin-boilerplate/internal/modules/user"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	platformmw "github.com/Massad/gin-boilerplate/internal/platform/middleware"
 	redisdb "github.com/Massad/gin-boilerplate/internal/platform/redisdb"
@@ -76,15 +77,20 @@ func NewRouter(deps Deps) *gin.Engine {
 		authSvc.StartSweep(auth.DefaultSweepInterval)
 
 		/*** START USER ***/
+		// Composition root of the user module: the platform stores and the
+		// tenant repository are read/resolved here for the transitory window
+		// (dette tracée pour post-Phase 8 : singletons prohibés hors
+		// composition root).
 		tenants := tenant.NewRepository(pgdb.AdminStore())
-		user := controllers.NewUserController(models.NewUserModel(authSvc, tenants))
+		users := user.NewService(user.NewRepository(pgdb.AdminStore(), pgdb.TenantStore()), tenants, authSvc, pgdb.AdminStore())
+		userHandler := user.NewHandler(users)
 
-		v1.POST("/user/login", user.Login)
-		v1.POST("/user/register", user.Register)
+		v1.POST("/user/login", userHandler.Login)
+		v1.POST("/user/register", userHandler.Register)
 		v1.GET("/user/logout", auth.TokenAuth(authSvc), authHandler.UserLogout)
 
 		/*** START AUTH ***/
-		authController := controllers.NewAuthController(authSvc)
+		authController := controllers.NewAuthController(authSvc, users)
 
 		v1.POST("/login", authController.Login)
 		v1.POST("/token/refresh", authController.Refresh)
