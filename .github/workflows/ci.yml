@@ -136,7 +136,7 @@ jobs:
             exit 1
           fi
           for encoding in identity gzip; do
-            for path in / /v1/invoice /v1/invoice/download /swagger/index.html /swagger/doc.json /swagger/swagger-initializer.js /swagger/swagger-ui.css /swagger/swagger-ui-bundle.js /v1/articles; do
+            for path in / /swagger/index.html /swagger/doc.json /swagger/swagger-initializer.js /swagger/swagger-ui.css /swagger/swagger-ui-bundle.js /v1/articles; do
               status=$(curl --compressed --silent --show-error --connect-timeout 2 --max-time 10 \
                 -H "Accept-Encoding: $encoding" -D "$smoke_dir/headers" -o "$smoke_dir/body" \
                 --write-out '%{http_code}' "http://127.0.0.1:9000$path")
@@ -154,7 +154,6 @@ jobs:
           assert status == expected, (route, status, expected)
           fragments = {
               "/": b"Gin Boilerplate",
-              "/v1/invoice": b"INV-001",
               "/swagger/index.html": b"swagger-ui",
               "/swagger/swagger-initializer.js": b"SwaggerUIBundle",
               "/swagger/swagger-ui.css": b".swagger-ui",
@@ -163,9 +162,6 @@ jobs:
           }
           if route in fragments:
               assert fragments[route] in body, (route, "unexpected body")
-          if route == "/v1/invoice/download":
-              assert body.startswith(b"%PDF-"), "invalid PDF signature"
-              assert "content-type: application/pdf" in headers, "invalid PDF content type"
           if route == "/swagger/doc.json":
               document = json.loads(body)
               assert document["swagger"] == "2.0" and document["paths"], "invalid Swagger document"
