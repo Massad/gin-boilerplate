@@ -15,6 +15,7 @@ import (
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/modules/article"
+	"github.com/Massad/gin-boilerplate/internal/modules/tenant"
 	"github.com/Massad/gin-boilerplate/models"
 )
 
@@ -32,16 +33,16 @@ func seed(t *testing.T) {
 	}
 }
 
-// NewTenantFixture returns a seeded tenant whose slug passes models.ValidSlug.
-func NewTenantFixture(t *testing.T) models.Tenant {
+// NewTenantFixture returns a seeded tenant whose slug passes tenant.ValidSlug.
+func NewTenantFixture(t *testing.T) tenant.Tenant {
 	t.Helper()
 	seed(t)
 	var name, slug string
 	for attempt := 0; attempt < 25; attempt++ {
 		name = gofakeit.Company()
-		slug = models.Slugify(name)
-		if models.ValidSlug(slug) {
-			return models.Tenant{
+		slug = tenant.Slugify(name)
+		if tenant.ValidSlug(slug) {
+			return tenant.Tenant{
 				ID:        uuid.MustParse(gofakeit.UUID()),
 				Slug:      slug,
 				Name:      name,
@@ -52,7 +53,7 @@ func NewTenantFixture(t *testing.T) models.Tenant {
 		}
 	}
 	t.Fatalf("no valid tenant slug after 25 seeded attempts")
-	return models.Tenant{}
+	return tenant.Tenant{}
 }
 
 // NewUserFixture returns a seeded owner together with the registration form

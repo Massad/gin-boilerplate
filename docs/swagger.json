@@ -95,7 +95,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.AllTenantResponse"
+                            "$ref": "#/definitions/tenant.AllTenantResponse"
                         }
                     },
                     "406": {
@@ -718,17 +718,6 @@
                 }
             }
         },
-        "models.AllTenantResponse": {
-            "type": "object",
-            "properties": {
-                "tenants": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.Tenant"
-                    }
-                }
-            }
-        },
         "models.LoginKind": {
             "type": "string",
             "enum": [
@@ -745,23 +734,6 @@
             "properties": {
                 "message": {
                     "type": "string"
-                }
-            }
-        },
-        "models.Tenant": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "integer"
                 }
             }
         },
@@ -833,6 +805,34 @@
                 },
                 "user": {
                     "$ref": "#/definitions/models.User"
+                }
+            }
+        },
+        "tenant.AllTenantResponse": {
+            "type": "object",
+            "properties": {
+                "tenants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tenant.Tenant"
+                    }
+                }
+            }
+        },
+        "tenant.Tenant": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
                 }
             }
         }

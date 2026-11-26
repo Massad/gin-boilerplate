@@ -1,4 +1,8 @@
-package models
+// Package tenant holds the tenant domain: slug derivation rules, in-Tx
+// provisioning consumed by the register flow and the platform backoffice
+// data. The tenant table is a platform table: every operation targets the
+// admin pool, never a tenant context.
+package tenant
 
 import (
 	"context"
@@ -6,31 +10,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"golang.org/x/text/unicode/norm"
 )
-
-// Tenant represents one organization sharing the platform database.
-type Tenant struct {
-	ID        uuid.UUID `json:"id"`
-	Slug      string    `json:"slug"`
-	Name      string    `json:"name"`
-	Status    int16     `json:"status"`
-	CreatedAt int64     `json:"-"`
-	UpdatedAt int64     `json:"-"`
-}
-
-// AllTenantResponse wraps the tenant list for the backoffice API.
-type AllTenantResponse struct {
-	Tenants []Tenant `json:"tenants"`
-}
 
 // ErrInvalidSlug is returned when a company name does not map to a usable slug.
 var ErrInvalidSlug = errors.New("the company name does not map to a valid slug")
@@ -39,7 +25,11 @@ var ErrInvalidSlug = errors.New("the company name does not map to a valid slug")
 var ErrSlugUnavailable = errors.New("a slug could not be generated for this company name")
 
 // reservedSlugs lists route roots already used by the platform: a tenant path
-// must never collide with them.
+// must never collide with them. The live route roots are the first segments
+// of the frozen route list pinned by the API contract test TestAPISurface
+// (tests/api_surface_test.go, P0.3): when a new root shows up there, it must
+// be mirrored here, otherwise a tenant could register its slug and shadow the
+// route.
 var reservedSlugs = map[string]bool{
 	"v1":      true,
 	"admin":   true,
@@ -93,30 +83,19 @@ func ValidSlug(slug string) bool {
 	return tenantSlugPattern.MatchString(slug) && !reservedSlugs[slug]
 }
 
-// TenantModel ...
-type TenantModel struct{}
-
-var tenantModel = new(TenantModel)
-
-// Create creates a tenant with a slug derived from name, suffixed -2, -3, ...
-// when the slug is already taken. It runs on the platform pool since tenant
-// registration is not a tenant-scoped operation.
-func (m TenantModel) Create(name string) (Tenant, error) {
-	ctx := context.Background()
-	var tenant Tenant
-	err := pgdb.AdminStore().InTx(ctx, func(tx pgx.Tx, q *pgdb.Queries) error {
-		var err error
-		tenant, err = createTenantInTx(ctx, q, name)
-		return err
-	})
-	if err != nil {
-		return Tenant{}, err
+// shortSlugCandidate builds suffixed candidates that keep the slug within the
+// maximum length accepted by the pattern.
+func shortSlugCandidate(base string, attempt int) string {
+	suffix := "-" + strconv.Itoa(attempt)
+	if len(base)+len(suffix) > maxSlugLength {
+		base = strings.Trim(base[:maxSlugLength-len(suffix)], "-")
 	}
-	return tenant, nil
+	return base + suffix
 }
 
 // createTenantInTx inserts the tenant inside the ongoing platform transaction,
-// retrying on slug collisions with the standard candidates.
+// retrying on slug collisions with the standard candidates. The tx-bound
+// *pgdb.Queries is reached only here, inside the executing module code.
 func createTenantInTx(ctx context.Context, q *pgdb.Queries, name string) (Tenant, error) {
 	base := Slugify(name)
 	if !ValidSlug(base) {
@@ -137,44 +116,4 @@ func createTenantInTx(ctx context.Context, q *pgdb.Queries, name string) (Tenant
 		}
 	}
 	return Tenant{}, ErrSlugUnavailable
-}
-
-// shortSlugCandidate builds suffixed candidates that keep the slug within the
-// maximum length accepted by the pattern.
-func shortSlugCandidate(base string, attempt int) string {
-	suffix := "-" + strconv.Itoa(attempt)
-	if len(base)+len(suffix) > maxSlugLength {
-		base = strings.Trim(base[:maxSlugLength-len(suffix)], "-")
-	}
-	return base + suffix
-}
-
-// All lists the tenants for the platform backoffice.
-func (m TenantModel) All() ([]Tenant, error) {
-	rows, err := pgdb.AdminStore().ListTenants(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	tenants := []Tenant{}
-	for _, row := range rows {
-		tenants = append(tenants, newTenant(row.ID, row.Slug, row.Name, row.Status, row.CreatedAt, row.UpdatedAt))
-	}
-	return tenants, nil
-}
-
-// SetStatus suspends (or reactivates) a tenant from the platform backoffice.
-func (m TenantModel) SetStatus(id uuid.UUID, status int16) error {
-	return pgdb.AdminStore().UpdateTenantStatus(context.Background(), pgdb.UpdateTenantStatusParams{ID: id, Status: status})
-}
-
-// newTenant maps a generated row to the API struct.
-func newTenant(id uuid.UUID, slug, name string, status int16, createdAt, updatedAt time.Time) Tenant {
-	return Tenant{
-		ID:        id,
-		Slug:      slug,
-		Name:      name,
-		Status:    status,
-		CreatedAt: createdAt.Unix(),
-		UpdatedAt: updatedAt.Unix(),
-	}
 }

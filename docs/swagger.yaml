@@ -138,13 +138,6 @@ definitions:
       name:
         type: string
     type: object
-  models.AllTenantResponse:
-    properties:
-      tenants:
-        items:
-          $ref: '#/definitions/models.Tenant'
-        type: array
-    type: object
   models.LoginKind:
     enum:
     - tenant_user
@@ -157,17 +150,6 @@ definitions:
     properties:
       message:
         type: string
-    type: object
-  models.Tenant:
-    properties:
-      id:
-        type: string
-      name:
-        type: string
-      slug:
-        type: string
-      status:
-        type: integer
     type: object
   models.TenantPayload:
     properties:
@@ -214,6 +196,24 @@ definitions:
         $ref: '#/definitions/auth.Token'
       user:
         $ref: '#/definitions/models.User'
+    type: object
+  tenant.AllTenantResponse:
+    properties:
+      tenants:
+        items:
+          $ref: '#/definitions/tenant.Tenant'
+        type: array
+    type: object
+  tenant.Tenant:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+      status:
+        type: integer
     type: object
 externalDocs:
   description: OpenAPI
@@ -283,7 +283,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.AllTenantResponse'
+            $ref: '#/definitions/tenant.AllTenantResponse'
         "406":
           description: Not Acceptable
           schema:

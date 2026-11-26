@@ -7,6 +7,7 @@ import (
 
 	"github.com/Massad/gin-boilerplate/forms"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+	"github.com/Massad/gin-boilerplate/internal/modules/tenant"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -42,16 +43,28 @@ type User struct {
 	Role     string    `json:"role"`
 }
 
+// TenantProvisioner creates tenants inside an ongoing platform transaction.
+// Consumer-side port of the user domain (design decision 6): implemented by
+// the tenant module and injected at the composition root; it moves into the
+// user module in Phase 5. The transaction-bound *pgdb.Queries is never a
+// parameter or return value of the port.
+type TenantProvisioner interface {
+	CreateInTx(ctx context.Context, tx pgdb.InTx, name string) (tenant.Tenant, error)
+}
+
 // UserModel issues and stores the session tokens of a login through the
 // injected session service (transitory window: the login moves into the user
 // module in Phase 5).
 type UserModel struct {
-	auth *auth.Service
+	auth    *auth.Service
+	tenants TenantProvisioner
 }
 
-// NewUserModel builds the user model on the injected session service.
-func NewUserModel(svc *auth.Service) UserModel {
-	return UserModel{auth: svc}
+// NewUserModel builds the user model on the injected session service and the
+// tenant provisioner (register creates the tenant inside its platform
+// transaction).
+func NewUserModel(svc *auth.Service, tenants TenantProvisioner) UserModel {
+	return UserModel{auth: svc, tenants: tenants}
 }
 
 // ErrTenantSuspended is returned when the credentials are correct but the
@@ -102,30 +115,30 @@ func (m UserModel) Login(form forms.LoginForm) (User, TenantPayload, auth.Token,
 }
 
 // Register creates the tenant and its owner atomically on the platform pool.
-func (m UserModel) Register(form forms.RegisterForm) (User, Tenant, error) {
+func (m UserModel) Register(form forms.RegisterForm) (User, tenant.Tenant, error) {
 	ctx := context.Background()
 
 	bytePassword := []byte(form.Password)
 	hashedPassword, err := bcrypt.GenerateFromPassword(bytePassword, bcrypt.DefaultCost)
 	if err != nil {
-		return User{}, Tenant{}, errors.New("something went wrong, please try again later")
+		return User{}, tenant.Tenant{}, errors.New("something went wrong, please try again later")
 	}
 
 	email := normalizeEmail(form.Email)
 
 	var user User
-	var tenant Tenant
-	store := pgdb.AdminStore()
-	err = store.InTx(ctx, func(tx pgx.Tx, q *pgdb.Queries) error {
-		tenant, err = createTenantInTx(ctx, q, form.Company)
+	var provisionedTenant tenant.Tenant
+	err = pgdb.AdminStore().WithinTx(ctx, func(tx pgdb.InTx) error {
+		created, err := m.tenants.CreateInTx(ctx, tx, form.Company)
 		if err != nil {
 			return err
 		}
-		ownerID, err := q.CreateUserOwner(ctx, pgdb.CreateUserOwnerParams{
+		provisionedTenant = created
+		ownerID, err := tx.Queries().CreateUserOwner(ctx, pgdb.CreateUserOwnerParams{
 			Email:    email,
 			Password: string(hashedPassword),
 			Name:     form.Name,
-			TenantID: tenant.ID,
+			TenantID: provisionedTenant.ID,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return errors.New("email already exists")
@@ -133,14 +146,14 @@ func (m UserModel) Register(form forms.RegisterForm) (User, Tenant, error) {
 		if err != nil {
 			return errors.New("something went wrong, please try again later")
 		}
-		user = User{ID: ownerID, Email: email, Name: form.Name, TenantID: tenant.ID, Role: "owner"}
+		user = User{ID: ownerID, Email: email, Name: form.Name, TenantID: provisionedTenant.ID, Role: "owner"}
 		return nil
 	})
 	if err != nil {
-		return User{}, Tenant{}, err
+		return User{}, tenant.Tenant{}, err
 	}
 
-	return user, tenant, nil
+	return user, provisionedTenant, nil
 }
 
 // UserWithTenantStatus bundles the refresh-time re-read of a user with the

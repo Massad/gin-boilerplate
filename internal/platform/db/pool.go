@@ -53,6 +53,34 @@ func (s Store) InTx(ctx context.Context, fn func(tx pgx.Tx, q *Queries) error) e
 	return tx.Commit(ctx)
 }
 
+// InTx is the narrow view of an ongoing transaction handed to the domain
+// code: the tx-bound queries are only reached inside the code of the module
+// executing them — never a parameter or return value of a cross-module port
+// (design decision 6).
+type InTx interface {
+	Queries() *Queries
+}
+
+// withinTx is the InTx view of one running transaction: it carries nothing
+// but the queries bound to it, the Begin/Rollback/Commit mechanics stay
+// inside WithinTx.
+type withinTx struct {
+	queries *Queries
+}
+
+// Queries returns the queries bound to the running transaction.
+func (w withinTx) Queries() *Queries { return w.queries }
+
+// WithinTx runs fn inside a transaction, handing it the narrow InTx view.
+// Strict wrapper of Store.InTx: the Begin/Rollback/Commit mechanics are
+// identical and no set_config is issued — the in-Tx register operations
+// target the admin BYPASSRLS pool without tenant context.
+func (s Store) WithinTx(ctx context.Context, fn func(tx InTx) error) error {
+	return s.InTx(ctx, func(tx pgx.Tx, q *Queries) error {
+		return fn(withinTx{queries: q})
+	})
+}
+
 // WithTenant runs fn inside a transaction with the RLS context set for
 // tenantID. The context is configured with set_config(..., true) so it resets
 // automatically on commit; a session-wide SET is forbidden on a shared pool.

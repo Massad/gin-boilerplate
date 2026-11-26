@@ -4,14 +4,29 @@ import (
 	"context"
 	"strings"
 
+	"github.com/Massad/gin-boilerplate/internal/modules/tenant"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // AdminModel ...
-type AdminModel struct{}
+type AdminModel struct {
+	tenants TenantReader
+}
+
+// TenantReader is the tenant access needed by the backoffice (consumer-side
+// port of the admin domain): implemented by the tenant module and injected at
+// the composition root; it moves into the admin module in Phase 6.
+type TenantReader interface {
+	List(ctx context.Context) ([]tenant.Tenant, error)
+	UpdateStatusTx(ctx context.Context, tx pgdb.InTx, tenantID uuid.UUID, status int16) error
+}
+
+// NewAdminModel builds the admin model on the injected tenant reader.
+func NewAdminModel(tenants TenantReader) AdminModel {
+	return AdminModel{tenants: tenants}
+}
 
 // AdminIdentity is the superadmin identity verified at login time. It is
 // embedded in the unified login response.
@@ -44,19 +59,22 @@ func (m AdminModel) Create(email string, passwordHash string, name string) (uuid
 	})
 }
 
-// AllTenants lists every tenant for the backoffice.
-func (m AdminModel) AllTenants() ([]Tenant, error) {
-	return tenantModel.All()
+// AllTenants lists every tenant for the backoffice (tenant repository on the
+// platform pool).
+func (m AdminModel) AllTenants() ([]tenant.Tenant, error) {
+	return m.tenants.List(context.Background())
 }
 
-// SetTenantStatus suspends or reactivates a tenant and writes the audit line in
-// the same platform transaction.
+// SetTenantStatus suspends or reactivates a tenant and writes the audit line
+// in the same platform transaction (the whole model moves into the admin
+// module in Phase 6).
 func (m AdminModel) SetTenantStatus(adminID, tenantID uuid.UUID, status int16) error {
-	return pgdb.AdminStore().InTx(context.Background(), func(tx pgx.Tx, q *pgdb.Queries) error {
-		if err := q.UpdateTenantStatus(context.Background(), pgdb.UpdateTenantStatusParams{ID: tenantID, Status: status}); err != nil {
+	ctx := context.Background()
+	return pgdb.AdminStore().WithinTx(ctx, func(tx pgdb.InTx) error {
+		if err := m.tenants.UpdateStatusTx(ctx, tx, tenantID, status); err != nil {
 			return err
 		}
-		return q.InsertAdminAudit(context.Background(), pgdb.InsertAdminAuditParams{
+		return tx.Queries().InsertAdminAudit(ctx, pgdb.InsertAdminAuditParams{
 			AdminID:  adminID,
 			TenantID: &tenantID,
 			Action:   "tenant.status.set",

@@ -4,6 +4,9 @@ import (
 	"net/http"
 
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+	// Blank import keeping tenant.AllTenantResponse resolvable for the Tenants
+	// swagger annotation (the type lives in the tenant module since Phase 4).
+	_ "github.com/Massad/gin-boilerplate/internal/modules/tenant"
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/platform/validate"
@@ -15,14 +18,15 @@ import (
 // AdminController serves the backoffice handlers during the transitory
 // migration window: the model moves into the admin module in Phase 6.
 type AdminController struct {
-	auth *auth.Service
+	auth  *auth.Service
+	admin models.AdminModel
 }
 
-var adminModel = new(models.AdminModel)
-
-// NewAdminController builds the controller on the injected session service.
-func NewAdminController(svc *auth.Service) *AdminController {
-	return &AdminController{auth: svc}
+// NewAdminController builds the controller on the injected session service
+// and the admin model (which consumes the tenant reader at the composition
+// root).
+func NewAdminController(svc *auth.Service, admin models.AdminModel) *AdminController {
+	return &AdminController{auth: svc, admin: admin}
 }
 
 // Login Admin godoc
@@ -45,7 +49,7 @@ func (ctl AdminController) Login(c *gin.Context) {
 		return
 	}
 
-	admin, err := adminModel.Login(loginForm.Email, loginForm.Password)
+	admin, err := ctl.admin.Login(loginForm.Email, loginForm.Password)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Invalid admin login details"})
 		return
@@ -70,11 +74,11 @@ func (ctl AdminController) Login(c *gin.Context) {
 // @Description List tenants for the platform backoffice
 // @Tags Admin
 // @Produce json
-// @Success 	 200  {object}  models.AllTenantResponse
+// @Success 	 200  {object}  tenant.AllTenantResponse
 // @Failure      406  {object}  models.MessageResponse
 // @Router /admin/tenants [get]
 func (ctl AdminController) Tenants(c *gin.Context) {
-	tenants, err := adminModel.AllTenants()
+	tenants, err := ctl.admin.AllTenants()
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Could not list tenants"})
 		return
@@ -113,7 +117,7 @@ func (ctl AdminController) SetTenantStatus(c *gin.Context) {
 		return
 	}
 
-	if err := adminModel.SetTenantStatus(adminID, tenantID, *form.Status); err != nil {
+	if err := ctl.admin.SetTenantStatus(adminID, tenantID, *form.Status); err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Tenant status could not be updated"})
 		return
 	}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/Massad/gin-boilerplate/internal/modules/tenant"
 	"github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-gonic/gin"
@@ -95,9 +96,9 @@ func (ctl UserController) Register(c *gin.Context) {
 		return
 	}
 
-	user, tenant, err := ctl.users.Register(registerForm)
+	user, createdTenant, err := ctl.users.Register(registerForm)
 	if err != nil {
-		if errors.Is(err, models.ErrInvalidSlug) || errors.Is(err, models.ErrSlugUnavailable) {
+		if errors.Is(err, tenant.ErrInvalidSlug) || errors.Is(err, tenant.ErrSlugUnavailable) {
 			c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": err.Error()})
 			return
 		}
@@ -105,7 +106,7 @@ func (ctl UserController) Register(c *gin.Context) {
 		return
 	}
 
-	payload := models.TenantPayload{ID: tenant.ID.String(), Slug: tenant.Slug, Name: tenant.Name}
+	payload := models.TenantPayload{ID: createdTenant.ID.String(), Slug: createdTenant.Slug, Name: createdTenant.Name}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully registered", "user": user, "tenant": payload})
 }

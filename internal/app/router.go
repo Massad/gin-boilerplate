@@ -13,10 +13,11 @@ import (
 	_ "github.com/Massad/gin-boilerplate/docs"
 	"github.com/Massad/gin-boilerplate/internal/modules/article"
 	auth "github.com/Massad/gin-boilerplate/internal/modules/auth"
+	"github.com/Massad/gin-boilerplate/internal/modules/tenant"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	platformmw "github.com/Massad/gin-boilerplate/internal/platform/middleware"
-	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
 	redisdb "github.com/Massad/gin-boilerplate/internal/platform/redisdb"
+	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/Massad/gin-boilerplate/models"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
@@ -75,7 +76,8 @@ func NewRouter(deps Deps) *gin.Engine {
 		authSvc.StartSweep(auth.DefaultSweepInterval)
 
 		/*** START USER ***/
-		user := controllers.NewUserController(models.NewUserModel(authSvc))
+		tenants := tenant.NewRepository(pgdb.AdminStore())
+		user := controllers.NewUserController(models.NewUserModel(authSvc, tenants))
 
 		v1.POST("/user/login", user.Login)
 		v1.POST("/user/register", user.Register)
@@ -98,7 +100,7 @@ func NewRouter(deps Deps) *gin.Engine {
 		v1.DELETE("/article/:id", auth.TokenAuth(authSvc), articleHandler.Delete)
 
 		/*** START ADMIN ***/
-		admin := controllers.NewAdminController(authSvc)
+		admin := controllers.NewAdminController(authSvc, models.NewAdminModel(tenants))
 
 		v1.POST("/admin/login", admin.Login)
 		adminAPI := v1.Group("/admin", auth.AdminAuth(authSvc))

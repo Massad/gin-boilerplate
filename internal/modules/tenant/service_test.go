@@ -1,4 +1,4 @@
-package models
+package tenant
 
 import (
 	"testing"
