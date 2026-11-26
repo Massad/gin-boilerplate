@@ -64,6 +64,20 @@ definitions:
       name:
         type: string
     type: object
+  auth.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  auth.Token:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
   forms.LoginForm:
     properties:
       email:
@@ -131,13 +145,6 @@ definitions:
           $ref: '#/definitions/models.Tenant'
         type: array
     type: object
-  models.AuthResponse:
-    properties:
-      access_token:
-        type: string
-      refresh_token:
-        type: string
-    type: object
   models.LoginKind:
     enum:
     - tenant_user
@@ -171,13 +178,6 @@ definitions:
       slug:
         type: string
     type: object
-  models.Token:
-    properties:
-      access_token:
-        type: string
-      refresh_token:
-        type: string
-    type: object
   models.UnifiedLoginResponse:
     properties:
       admin:
@@ -187,7 +187,7 @@ definitions:
       tenant:
         $ref: '#/definitions/models.TenantPayload'
       token:
-        $ref: '#/definitions/models.Token'
+        $ref: '#/definitions/auth.Token'
       user:
         $ref: '#/definitions/models.User'
     type: object
@@ -211,7 +211,7 @@ definitions:
       tenant:
         $ref: '#/definitions/models.TenantPayload'
       token:
-        $ref: '#/definitions/models.Token'
+        $ref: '#/definitions/auth.Token'
       user:
         $ref: '#/definitions/models.User'
     type: object
@@ -251,7 +251,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.AuthResponse'
+            $ref: '#/definitions/auth.AuthResponse'
         "406":
           description: Not Acceptable
           schema:
@@ -478,7 +478,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.AuthResponse'
+            $ref: '#/definitions/auth.AuthResponse'
         "406":
           description: Not Acceptable
           schema:

@@ -52,7 +52,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.AuthResponse"
+                            "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "406": {
@@ -396,7 +396,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.AuthResponse"
+                            "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "406": {
@@ -616,6 +616,28 @@ const docTemplate = `{
                 }
             }
         },
+        "auth.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.Token": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "forms.LoginForm": {
             "type": "object",
             "required": [
@@ -713,17 +735,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.AuthResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
         "models.LoginKind": {
             "type": "string",
             "enum": [
@@ -774,17 +785,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Token": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
         "models.UnifiedLoginResponse": {
             "type": "object",
             "properties": {
@@ -798,7 +798,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/models.TenantPayload"
                 },
                 "token": {
-                    "$ref": "#/definitions/models.Token"
+                    "$ref": "#/definitions/auth.Token"
                 },
                 "user": {
                     "$ref": "#/definitions/models.User"
@@ -835,7 +835,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/models.TenantPayload"
                 },
                 "token": {
-                    "$ref": "#/definitions/models.Token"
+                    "$ref": "#/definitions/auth.Token"
                 },
                 "user": {
                     "$ref": "#/definitions/models.User"

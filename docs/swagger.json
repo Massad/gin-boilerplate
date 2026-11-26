@@ -46,7 +46,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.AuthResponse"
+                            "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "406": {
@@ -390,7 +390,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.AuthResponse"
+                            "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "406": {
@@ -610,6 +610,28 @@
                 }
             }
         },
+        "auth.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.Token": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "forms.LoginForm": {
             "type": "object",
             "required": [
@@ -707,17 +729,6 @@
                 }
             }
         },
-        "models.AuthResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
         "models.LoginKind": {
             "type": "string",
             "enum": [
@@ -768,17 +779,6 @@
                 }
             }
         },
-        "models.Token": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
         "models.UnifiedLoginResponse": {
             "type": "object",
             "properties": {
@@ -792,7 +792,7 @@
                     "$ref": "#/definitions/models.TenantPayload"
                 },
                 "token": {
-                    "$ref": "#/definitions/models.Token"
+                    "$ref": "#/definitions/auth.Token"
                 },
                 "user": {
                     "$ref": "#/definitions/models.User"
@@ -829,7 +829,7 @@
                     "$ref": "#/definitions/models.TenantPayload"
                 },
                 "token": {
-                    "$ref": "#/definitions/models.Token"
+                    "$ref": "#/definitions/auth.Token"
                 },
                 "user": {
                     "$ref": "#/definitions/models.User"
