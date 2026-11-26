@@ -104,19 +104,22 @@ generate_sqlc: install_sqlc
 	@echo "Generating sqlc code..."
 	@"$(SQLC_BIN)" generate
 
-MOCKERY_VERSION := v2.53.8
-MOCKERY_BIN := $(CURDIR)/.cache/tools/mockery/$(MOCKERY_VERSION)/mockery
+## NOTE: not named MOCKERY_VERSION/MOCKERY_BIN — the global `export` would leak
+## them into mockery's MOCKERY_* env config overrides (viper collision on the
+## `version` key breaks every generate_mocks run).
+MOCKERY_CLI_VERSION := v2.53.8
+MOCKERY_CLI_BIN := $(CURDIR)/.cache/tools/mockery/$(MOCKERY_CLI_VERSION)/mockery
 
 ## INSTALL THE PINNED MOCKERY CLI
 install_mockery:
-	@echo "Installing mockery $(MOCKERY_VERSION)..."
-	@mkdir -p "$(dir $(MOCKERY_BIN))"
-	@GOBIN="$(dir $(MOCKERY_BIN))" go install github.com/vektra/mockery/v2@$(MOCKERY_VERSION)
+	@echo "Installing mockery $(MOCKERY_CLI_VERSION)..."
+	@mkdir -p "$(dir $(MOCKERY_CLI_BIN))"
+	@GOBIN="$(dir $(MOCKERY_CLI_BIN))" go install github.com/vektra/mockery/v2@$(MOCKERY_CLI_VERSION)
 
 ## GENERATE MOCKS FROM .mockery.yaml
 generate_mocks: install_mockery
 	@echo "Generating mockery mocks..."
-	@"$(MOCKERY_BIN)" --config=.mockery.yaml
+	@"$(MOCKERY_CLI_BIN)" --config=.mockery.yaml
 
 GOOSE_VERSION := v3.20.0
 GOOSE_BIN := $(CURDIR)/.cache/tools/goose/$(GOOSE_VERSION)/goose
