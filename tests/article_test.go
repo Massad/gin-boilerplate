@@ -18,6 +18,7 @@ import (
 
 	"github.com/Massad/gin-boilerplate/forms"
 	"github.com/Massad/gin-boilerplate/internal/app"
+	"github.com/Massad/gin-boilerplate/internal/modules/article"
 	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	"github.com/Massad/gin-boilerplate/internal/platform/redisdb"
 	testutil "github.com/Massad/gin-boilerplate/internal/testutil"
@@ -311,7 +312,7 @@ func TestInvalidLogin(t *testing.T) {
 func TestCreateArticle(t *testing.T) {
 	testRouter := testRouter()
 
-	form := forms.CreateArticleForm{
+	form := article.CreateArticleForm{
 		Title:   "Testing article title",
 		Content: "Testing article content",
 	}
@@ -436,7 +437,7 @@ func TestGetArticleUnauthorized(t *testing.T) {
 func TestUpdateArticle(t *testing.T) {
 	testRouter := testRouter()
 
-	form := forms.CreateArticleForm{
+	form := article.CreateArticleForm{
 		Title:   "Testing new article title",
 		Content: "Testing new article content",
 	}
@@ -497,7 +498,7 @@ func TestCrossTenantIsolation(t *testing.T) {
 
 	// A's article is invisible for B (RLS: the row does not exist).
 	require.Equal(t, http.StatusNotFound, doRequest(testRouter, "GET", fmt.Sprintf("/v1/article/%s", articleID), nil, accessTokenB).Code)
-	require.Equal(t, http.StatusNotFound, doRequest(testRouter, "PUT", fmt.Sprintf("/v1/article/%s", articleID), forms.CreateArticleForm{Title: "Stolen title", Content: "Stolen content"}, accessTokenB).Code)
+	require.Equal(t, http.StatusNotFound, doRequest(testRouter, "PUT", fmt.Sprintf("/v1/article/%s", articleID), article.CreateArticleForm{Title: "Stolen title", Content: "Stolen content"}, accessTokenB).Code)
 	require.Equal(t, http.StatusNotFound, doRequest(testRouter, "DELETE", fmt.Sprintf("/v1/article/%s", articleID), nil, accessTokenB).Code)
 
 	// B's own list is empty.
@@ -523,7 +524,7 @@ func TestCrossTenantIsolation(t *testing.T) {
 func TestGetArticleB(t *testing.T) {
 	testRouter := testRouter()
 
-	form := forms.CreateArticleForm{
+	form := article.CreateArticleForm{
 		Title:   "B article title",
 		Content: "B article content",
 	}

@@ -1,22 +1,36 @@
-package controllers
+package article
 
 import (
 	"errors"
-
-	"github.com/Massad/gin-boilerplate/forms"
-	"github.com/Massad/gin-boilerplate/internal/platform/validate"
-	"github.com/Massad/gin-boilerplate/models"
-	"github.com/google/uuid"
-
 	"net/http"
 
+	"github.com/Massad/gin-boilerplate/internal/platform/httpx"
+	"github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
-// ArticleController ...
-type ArticleController struct{}
+// Handler serves the /v1 article HTTP surface.
+type Handler struct {
+	articles *Service
+}
 
-var articleModel = new(models.ArticleModel)
+// NewHandler builds the article handler on its service.
+func NewHandler(articles *Service) *Handler {
+	return &Handler{articles: articles}
+}
+
+// getUserID reads the authenticated user id set by TokenAuth.
+func getUserID(c *gin.Context) (userID uuid.UUID) {
+	userID, _ = uuid.Parse(c.GetString("userID"))
+	return userID
+}
+
+// getTenantID reads the authenticated tenant id set by TokenAuth.
+func getTenantID(c *gin.Context) (tenantID uuid.UUID) {
+	tenantID, _ = uuid.Parse(c.GetString("tenantID"))
+	return tenantID
+}
 
 // Create Article godoc
 // @Summary Create Article example
@@ -25,25 +39,25 @@ var articleModel = new(models.ArticleModel)
 // @Tags Article
 // @Accept json
 // @Produce json
-// @Param article body forms.CreateArticleForm true "Article"
-// @Success 	 200  {object}  forms.ArticleResponse
-// @Failure      406  {object}  forms.ArticleResponse
+// @Param article body article.CreateArticleForm true "Article"
+// @Success 	 200  {object}  article.ArticleResponse
+// @Failure      406  {object}  article.ArticleResponse
 // @Router /article [post]
-func (ctrl ArticleController) Create(c *gin.Context) {
+func (h Handler) Create(c *gin.Context) {
 	userID := getUserID(c)
 	tenantID := getTenantID(c)
 
-	var form forms.CreateArticleForm
+	var form CreateArticleForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
-		message := validate.Translate(validationErr, forms.ArticleMessages)
-		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
+		message := validate.Translate(validationErr, ArticleMessages)
+		httpx.AbortMessage(c, http.StatusNotAcceptable, message)
 		return
 	}
 
-	id, err := articleModel.Create(c.Request.Context(), tenantID, userID, form)
+	id, err := h.articles.Create(c.Request.Context(), tenantID, userID, form)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": "Article could not be created"})
+		httpx.AbortMessage(c, http.StatusNotAcceptable, "Article could not be created")
 		return
 	}
 
@@ -57,14 +71,14 @@ func (ctrl ArticleController) Create(c *gin.Context) {
 // @Tags Article
 // @Accept json
 // @Produce json
-// @Success 	 200  {object}  models.AllArticleResponse
-// @Failure      406  {object}  forms.ArticleResponse
+// @Success 	 200  {object}  article.AllArticleResponse
+// @Failure      406  {object}  article.ArticleResponse
 // @Router /articles [GET]
-func (ctrl ArticleController) All(c *gin.Context) {
+func (h Handler) All(c *gin.Context) {
 	userID := getUserID(c)
 	tenantID := getTenantID(c)
 
-	results, err := articleModel.All(c.Request.Context(), tenantID, userID)
+	results, err := h.articles.All(c.Request.Context(), tenantID, userID)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"Message": "Could not get articles"})
 		return
@@ -80,22 +94,20 @@ func (ctrl ArticleController) All(c *gin.Context) {
 // @Tags Article
 // @Accept json
 // @Produce json
-// @Success 	 200  {object}  models.OneArticleResponse
-// @Failure      406  {object}  forms.ArticleResponse
+// @Success 	 200  {object}  article.OneArticleResponse
+// @Failure      406  {object}  article.ArticleResponse
 // @Router /article/{id} [GET]
-func (ctrl ArticleController) One(c *gin.Context) {
+func (h Handler) One(c *gin.Context) {
 	userID := getUserID(c)
 	tenantID := getTenantID(c)
 
-	id := c.Param("id")
-
-	getID, err := uuid.Parse(id)
+	getID, err := httpx.ParseUUIDParam(c, "id")
 	if err != nil || getID == uuid.Nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 		return
 	}
 
-	data, err := articleModel.One(c.Request.Context(), tenantID, userID, getID)
+	data, err := h.articles.One(c.Request.Context(), tenantID, userID, getID)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Article not found"})
 		return
@@ -111,33 +123,31 @@ func (ctrl ArticleController) One(c *gin.Context) {
 // @Tags Article
 // @Accept json
 // @Produce json
-// @Param article body forms.CreateArticleForm true "Article"
-// @Success 	 200  {object}  models.ArticleResponse
-// @Failure      406  {object}  forms.ArticleResponse
+// @Param article body article.CreateArticleForm true "Article"
+// @Success 	 200  {object}  article.ArticleResponse
+// @Failure      406  {object}  article.ArticleResponse
 // @Router /article/{id} [PUT]
-func (ctrl ArticleController) Update(c *gin.Context) {
+func (h Handler) Update(c *gin.Context) {
 	userID := getUserID(c)
 	tenantID := getTenantID(c)
 
-	id := c.Param("id")
-
-	getID, err := uuid.Parse(id)
+	getID, err := httpx.ParseUUIDParam(c, "id")
 	if err != nil || getID == uuid.Nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 		return
 	}
 
-	var form forms.CreateArticleForm
+	var form CreateArticleForm
 
 	if validationErr := c.ShouldBindJSON(&form); validationErr != nil {
-		message := validate.Translate(validationErr, forms.ArticleMessages)
-		c.AbortWithStatusJSON(http.StatusNotAcceptable, gin.H{"message": message})
+		message := validate.Translate(validationErr, ArticleMessages)
+		httpx.AbortMessage(c, http.StatusNotAcceptable, message)
 		return
 	}
 
-	err = articleModel.Update(c.Request.Context(), tenantID, userID, getID, form)
+	err = h.articles.Update(c.Request.Context(), tenantID, userID, getID, form)
 	if err != nil {
-		if errors.Is(err, models.ErrNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Article not found"})
 			return
 		}
@@ -145,7 +155,7 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Article updated"})
+	httpx.JSONMessage(c, http.StatusOK, "Article updated")
 }
 
 // Delete Article godoc
@@ -155,25 +165,23 @@ func (ctrl ArticleController) Update(c *gin.Context) {
 // @Tags Article
 // @Accept json
 // @Produce json
-// @Success 	 200  {object}  models.OneArticleResponse
-// @Success 	 404  {object}  forms.ArticleResponse
-// @Failure      406  {object}  forms.ArticleResponse
+// @Success 	 200  {object}  article.OneArticleResponse
+// @Success 	 404  {object}  article.ArticleResponse
+// @Failure      406  {object}  article.ArticleResponse
 // @Router /article/{id} [DELETE]
-func (ctrl ArticleController) Delete(c *gin.Context) {
+func (h Handler) Delete(c *gin.Context) {
 	userID := getUserID(c)
 	tenantID := getTenantID(c)
 
-	id := c.Param("id")
-
-	getID, err := uuid.Parse(id)
+	getID, err := httpx.ParseUUIDParam(c, "id")
 	if err != nil || getID == uuid.Nil {
 		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Invalid parameter"})
 		return
 	}
 
-	err = articleModel.Delete(c.Request.Context(), tenantID, userID, getID)
+	err = h.articles.Delete(c.Request.Context(), tenantID, userID, getID)
 	if err != nil {
-		if errors.Is(err, models.ErrNotFound) {
+		if errors.Is(err, ErrNotFound) {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"Message": "Article not found"})
 			return
 		}
@@ -181,5 +189,5 @@ func (ctrl ArticleController) Delete(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Article deleted"})
+	httpx.JSONMessage(c, http.StatusOK, "Article deleted")
 }

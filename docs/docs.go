@@ -173,7 +173,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/forms.CreateArticleForm"
+                            "$ref": "#/definitions/article.CreateArticleForm"
                         }
                     }
                 ],
@@ -181,13 +181,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/forms.ArticleResponse"
+                            "$ref": "#/definitions/article.ArticleResponse"
                         }
                     },
                     "406": {
                         "description": "Not Acceptable",
                         "schema": {
-                            "$ref": "#/definitions/forms.ArticleResponse"
+                            "$ref": "#/definitions/article.ArticleResponse"
                         }
                     }
                 }
@@ -210,13 +210,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.OneArticleResponse"
+                            "$ref": "#/definitions/article.OneArticleResponse"
                         }
                     },
                     "406": {
                         "description": "Not Acceptable",
                         "schema": {
-                            "$ref": "#/definitions/forms.ArticleResponse"
+                            "$ref": "#/definitions/article.ArticleResponse"
                         }
                     }
                 }
@@ -240,7 +240,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/forms.CreateArticleForm"
+                            "$ref": "#/definitions/article.CreateArticleForm"
                         }
                     }
                 ],
@@ -248,13 +248,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.ArticleResponse"
+                            "$ref": "#/definitions/article.ArticleResponse"
                         }
                     },
                     "406": {
                         "description": "Not Acceptable",
                         "schema": {
-                            "$ref": "#/definitions/forms.ArticleResponse"
+                            "$ref": "#/definitions/article.ArticleResponse"
                         }
                     }
                 }
@@ -275,19 +275,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.OneArticleResponse"
+                            "$ref": "#/definitions/article.OneArticleResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/forms.ArticleResponse"
+                            "$ref": "#/definitions/article.ArticleResponse"
                         }
                     },
                     "406": {
                         "description": "Not Acceptable",
                         "schema": {
-                            "$ref": "#/definitions/forms.ArticleResponse"
+                            "$ref": "#/definitions/article.ArticleResponse"
                         }
                     }
                 }
@@ -310,13 +310,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.AllArticleResponse"
+                            "$ref": "#/definitions/article.AllArticleResponse"
                         }
                     },
                     "406": {
                         "description": "Not Acceptable",
                         "schema": {
-                            "$ref": "#/definitions/forms.ArticleResponse"
+                            "$ref": "#/definitions/article.ArticleResponse"
                         }
                     }
                 }
@@ -519,18 +519,41 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "forms.ArticleResponse": {
+        "article.AllArticleResponse": {
             "type": "object",
             "properties": {
-                "id": {
-                    "type": "integer"
-                },
-                "message": {
-                    "type": "string"
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/article.Result"
+                    }
                 }
             }
         },
-        "forms.CreateArticleForm": {
+        "article.ArticleResponse": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer"
+                },
+                "user": {
+                    "$ref": "#/definitions/article.UserResponse"
+                }
+            }
+        },
+        "article.CreateArticleForm": {
             "type": "object",
             "required": [
                 "content",
@@ -546,6 +569,50 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 100,
                     "minLength": 3
+                }
+            }
+        },
+        "article.Meta": {
+            "type": "object",
+            "properties": {
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "article.OneArticleResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/article.ArticleResponse"
+                }
+            }
+        },
+        "article.Result": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/article.ArticleResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/article.Meta"
+                }
+            }
+        },
+        "article.UserResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -635,17 +702,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.AllArticleResponse": {
-            "type": "object",
-            "properties": {
-                "results": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.Result"
-                    }
-                }
-            }
-        },
         "models.AllTenantResponse": {
             "type": "object",
             "properties": {
@@ -654,29 +710,6 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.Tenant"
                     }
-                }
-            }
-        },
-        "models.ArticleResponse": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "integer"
-                },
-                "user": {
-                    "$ref": "#/definitions/models.UserResponse"
                 }
             }
         },
@@ -707,36 +740,6 @@ const docTemplate = `{
             "properties": {
                 "message": {
                     "type": "string"
-                }
-            }
-        },
-        "models.Meta": {
-            "type": "object",
-            "properties": {
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "models.OneArticleResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "$ref": "#/definitions/models.ArticleResponse"
-                }
-            }
-        },
-        "models.Result": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.ArticleResponse"
-                    }
-                },
-                "meta": {
-                    "$ref": "#/definitions/models.Meta"
                 }
             }
         },
@@ -836,20 +839,6 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/models.User"
-                }
-            }
-        },
-        "models.UserResponse": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
                 }
             }
         }

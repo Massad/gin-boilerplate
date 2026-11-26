@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Massad/gin-boilerplate/forms"
+	"github.com/Massad/gin-boilerplate/internal/modules/article"
 	"github.com/Massad/gin-boilerplate/models"
 )
 
@@ -96,10 +97,10 @@ func NewAdminFixture(t *testing.T) (email, password string) {
 // NewArticleFixture returns a seeded article form. The tenant and user ids are
 // accepted for row-building callers; the form itself carries title and content
 // only.
-func NewArticleFixture(t *testing.T, tenantID, userID uuid.UUID) forms.CreateArticleForm {
+func NewArticleFixture(t *testing.T, tenantID, userID uuid.UUID) article.CreateArticleForm {
 	t.Helper()
 	seed(t)
-	return forms.CreateArticleForm{
+	return article.CreateArticleForm{
 		Title:   clampGenerated(gofakeit.JobTitle(), 3, 100),
 		Content: clampGenerated(gofakeit.Sentence(9), 3, 1000),
 	}

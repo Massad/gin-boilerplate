@@ -1,13 +1,28 @@
 basePath: /v1
 definitions:
-  forms.ArticleResponse:
+  article.AllArticleResponse:
     properties:
-      id:
-        type: integer
-      message:
-        type: string
+      results:
+        items:
+          $ref: '#/definitions/article.Result'
+        type: array
     type: object
-  forms.CreateArticleForm:
+  article.ArticleResponse:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: integer
+      id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: integer
+      user:
+        $ref: '#/definitions/article.UserResponse'
+    type: object
+  article.CreateArticleForm:
     properties:
       content:
         maxLength: 1000
@@ -20,6 +35,34 @@ definitions:
     required:
     - content
     - title
+    type: object
+  article.Meta:
+    properties:
+      total:
+        type: integer
+    type: object
+  article.OneArticleResponse:
+    properties:
+      data:
+        $ref: '#/definitions/article.ArticleResponse'
+    type: object
+  article.Result:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/article.ArticleResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/article.Meta'
+    type: object
+  article.UserResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
     type: object
   forms.LoginForm:
     properties:
@@ -81,34 +124,12 @@ definitions:
       name:
         type: string
     type: object
-  models.AllArticleResponse:
-    properties:
-      results:
-        items:
-          $ref: '#/definitions/models.Result'
-        type: array
-    type: object
   models.AllTenantResponse:
     properties:
       tenants:
         items:
           $ref: '#/definitions/models.Tenant'
         type: array
-    type: object
-  models.ArticleResponse:
-    properties:
-      content:
-        type: string
-      created_at:
-        type: integer
-      id:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: integer
-      user:
-        $ref: '#/definitions/models.UserResponse'
     type: object
   models.AuthResponse:
     properties:
@@ -129,25 +150,6 @@ definitions:
     properties:
       message:
         type: string
-    type: object
-  models.Meta:
-    properties:
-      total:
-        type: integer
-    type: object
-  models.OneArticleResponse:
-    properties:
-      data:
-        $ref: '#/definitions/models.ArticleResponse'
-    type: object
-  models.Result:
-    properties:
-      data:
-        items:
-          $ref: '#/definitions/models.ArticleResponse'
-        type: array
-      meta:
-        $ref: '#/definitions/models.Meta'
     type: object
   models.Tenant:
     properties:
@@ -212,15 +214,6 @@ definitions:
         $ref: '#/definitions/models.Token'
       user:
         $ref: '#/definitions/models.User'
-    type: object
-  models.UserResponse:
-    properties:
-      email:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
     type: object
 externalDocs:
   description: OpenAPI
@@ -335,18 +328,18 @@ paths:
         name: article
         required: true
         schema:
-          $ref: '#/definitions/forms.CreateArticleForm'
+          $ref: '#/definitions/article.CreateArticleForm'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/forms.ArticleResponse'
+            $ref: '#/definitions/article.ArticleResponse'
         "406":
           description: Not Acceptable
           schema:
-            $ref: '#/definitions/forms.ArticleResponse'
+            $ref: '#/definitions/article.ArticleResponse'
       summary: Create Article example
       tags:
       - Article
@@ -361,15 +354,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.OneArticleResponse'
+            $ref: '#/definitions/article.OneArticleResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/forms.ArticleResponse'
+            $ref: '#/definitions/article.ArticleResponse'
         "406":
           description: Not Acceptable
           schema:
-            $ref: '#/definitions/forms.ArticleResponse'
+            $ref: '#/definitions/article.ArticleResponse'
       summary: Delete Article example
       tags:
       - Article
@@ -383,11 +376,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.OneArticleResponse'
+            $ref: '#/definitions/article.OneArticleResponse'
         "406":
           description: Not Acceptable
           schema:
-            $ref: '#/definitions/forms.ArticleResponse'
+            $ref: '#/definitions/article.ArticleResponse'
       summary: Get One Article example
       tags:
       - Article
@@ -401,18 +394,18 @@ paths:
         name: article
         required: true
         schema:
-          $ref: '#/definitions/forms.CreateArticleForm'
+          $ref: '#/definitions/article.CreateArticleForm'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.ArticleResponse'
+            $ref: '#/definitions/article.ArticleResponse'
         "406":
           description: Not Acceptable
           schema:
-            $ref: '#/definitions/forms.ArticleResponse'
+            $ref: '#/definitions/article.ArticleResponse'
       summary: Update Article example
       tags:
       - Article
@@ -427,11 +420,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.AllArticleResponse'
+            $ref: '#/definitions/article.AllArticleResponse'
         "406":
           description: Not Acceptable
           schema:
-            $ref: '#/definitions/forms.ArticleResponse'
+            $ref: '#/definitions/article.ArticleResponse'
       summary: Get All Articles example
       tags:
       - Article

@@ -1,19 +1,15 @@
-package forms
+// Package article serves the tenant article CRUD resource: the /v1 article
+// HTTP surface, its use cases and its tenant-backed repository.
+package article
 
 import (
 	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
 )
 
-// CreateArticleForm ...
+// CreateArticleForm is the create/update payload, validated with binding tags.
 type CreateArticleForm struct {
 	Title   string `form:"title" json:"title" binding:"required,min=3,max=100"`
 	Content string `form:"content" json:"content" binding:"required,min=3,max=1000"`
-}
-
-// ArticleResponse ...
-type ArticleResponse struct {
-	ID      int64  `json:"id"`
-	Message string `json:"message"`
 }
 
 // ArticleMessages defines validation error messages for article forms.

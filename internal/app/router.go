@@ -11,6 +11,8 @@ import (
 
 	"github.com/Massad/gin-boilerplate/controllers"
 	_ "github.com/Massad/gin-boilerplate/docs"
+	"github.com/Massad/gin-boilerplate/internal/modules/article"
+	pgdb "github.com/Massad/gin-boilerplate/internal/platform/db"
 	platformmw "github.com/Massad/gin-boilerplate/internal/platform/middleware"
 	validate "github.com/Massad/gin-boilerplate/internal/platform/validate"
 	"github.com/Massad/gin-boilerplate/middleware"
@@ -74,13 +76,14 @@ func NewRouter(deps Deps) *gin.Engine {
 		v1.POST("/token/refresh", auth.Refresh)
 
 		/*** START Article ***/
-		article := new(controllers.ArticleController)
+		articles := article.NewService(article.NewRepository(pgdb.TenantStore()))
+		articleHandler := article.NewHandler(articles)
 
-		v1.POST("/article", middleware.TokenAuth(), article.Create)
-		v1.GET("/articles", middleware.TokenAuth(), article.All)
-		v1.GET("/article/:id", middleware.TokenAuth(), article.One)
-		v1.PUT("/article/:id", middleware.TokenAuth(), article.Update)
-		v1.DELETE("/article/:id", middleware.TokenAuth(), article.Delete)
+		v1.POST("/article", middleware.TokenAuth(), articleHandler.Create)
+		v1.GET("/articles", middleware.TokenAuth(), articleHandler.All)
+		v1.GET("/article/:id", middleware.TokenAuth(), articleHandler.One)
+		v1.PUT("/article/:id", middleware.TokenAuth(), articleHandler.Update)
+		v1.DELETE("/article/:id", middleware.TokenAuth(), articleHandler.Delete)
 
 		/*** START ADMIN ***/
 		admin := new(controllers.AdminController)
