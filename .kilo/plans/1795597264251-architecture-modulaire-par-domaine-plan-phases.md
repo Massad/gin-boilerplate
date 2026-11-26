@@ -5,6 +5,7 @@
 ## Detailed Implementation Plan — Feuille de route par phases
 
 ### Phase 0 — Filet de sécurité (aucun déplacement de code)
+- **[Fait 2026-11-26]** branche `refactor/modular-phase-0` (commits `30ae675` → `959f50e` → `67c9e77`, fourchue de `modular_archi` `07d81c4`) — gate PASS : `.kilo/plans/1795597264251-impl-log/L0-gate.md` ; `TestAPISurface` vert sans éditer la liste attendue ; régénérations idempotentes (correctif outillage mockery `959f50e`) ; CI distante à valider au push.
 - **Objet** : corriger la dérive smoke CI, figer la baseline, poser le test contrat d'API, instaurer la discipline de commits (≈ 4 commits).
 - **Risques/Validation** : aucun déplacement de code ; description étape par étape dans « Étapes détaillées — Phases 0-1 » ci-dessous ; CI verte sur la branche.
 
