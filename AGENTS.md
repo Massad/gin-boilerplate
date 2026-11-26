@@ -10,7 +10,7 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 - `make services_up` / `make services_down` / `make postgres_up` / `make redis_up` / `make check_ports` — stack dev Docker (`docker-compose.yml` à la racine, projet `name: artisan-dev`, images `postgres:18-alpine` / `redis:8-alpine`, ports loopback `127.0.0.1:15432` / `127.0.0.1:16379`, volumes nommés, `--wait` sur les healthchecks) ; le prérequis `services_up` porte sur `run`/`test`/`e2e` uniquement — **jamais sur les migrations** (la CI les invoque aussi) ; `check_ports` échoue si compose et `.env` divergent sur les ports ; contrat du schéma : `services_up` démarre le cluster, `make migrate_up` (superuser) crée le schéma — démarrer les conteneurs ne dispense pas de la première migration ; reset destructeur : `docker compose down -v` (efface données et sessions Redis, re-login requis)
 - `make migrate_up` / `make migrate_down` — migrations goose (`db/migrations/`, épinglé dans le Makefile). JAMAIS de `psql < db/*.sql` direct. Le superuser n'est requis que pour migrer (la migration 000002 crée les rôles `app_user`/`app_admin`) ; l'app et les tests se connectent en rôles non-superuser
 - `make generate_sqlc` — régénère `internal/db/` ; à rejouer après TOUTE modification de `db/queries/` ou `db/migrations/`, code généré commité (la CI le vérifie par `git diff --exit-code internal/db`) ; sqlc épinglé v1.30.0 (v1.27.0 crashait au démarrage : runtime wasm wazero incompatible avec la toolchain Go locale) — outil encore flaky, relancer la cible en cas de panic
-- `go run . -create-admin -email <e> -password <p> [-name "Prénom Nom"]` — bootstrap superadmin (CLI, aucune route HTTP) ; requiert le pool admin ; `-name` par défaut « Superadmin », upsert idempotent (email existant → mot de passe et nom remis à jour)
+- `go run ./cmd/api -create-admin -email <e> -password <p> [-name "Prénom Nom"]` — bootstrap superadmin (CLI, aucune route HTTP) ; requiert le pool admin ; `-name` par défaut « Superadmin », upsert idempotent (email existant → mot de passe et nom remis à jour)
 - `go test -mod=readonly -count=1 -race -v ./invoice` — tests PDF sans base de données (requiert `pdftotext` / poppler)
 - `go build -mod=readonly .` et `go vet -mod=readonly ./...` — build + vet (toujours avec `-mod=readonly`)
 - `make generate_docs` — régénère la doc Swagger (swag épinglé v1.16.6, installé via `make install_swag`)
@@ -19,17 +19,19 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 
 ## Structure
 
-- `main.go` — point d'entrée, routes `/v1`, annotations Swagger principales, fallback SPA (`r.NoRoute`), CLI `-create-admin`
+- `cmd/api/main.go` — point d'entrée : dotenv, flags, secrets, deux pools pgx, Redis, puis `app.NewRouter` ; CLI `-create-admin` ; annotations Swagger principales (général info)
+- `internal/app/router.go` — composition root : `app.NewRouter(deps)` — middleware chain (CORS/RequestID platform + gzip), routes `/v1`, Swagger non-prod, fallback SPA (`r.NoRoute`) ; partagé par `cmd/api` ET les suites (`tests/`)
+- `internal/platform/config/` — validation des 3 secrets de signature (`ValidateSigningSecrets`)
+- `internal/platform/redisdb/` — init Redis (`RedisDBIndex`, `InitRedis() error` (l'index vient de `REDIS_DB`)/`GetRedis`)
+- `internal/platform/db/` — code GÉNÉRÉ sqlc (ne pas éditer à la main) + `pool.go` écrit à la main : deux pools pgx (tenant `app_user` / admin `app_admin BYPASSRLS`), `WithTenant`, `postgresDSN`
+- `internal/platform/middleware/` — CORS, RequestID (purs Gin) ; `internal/platform/validate/` — `DefaultValidator`, `Translate` (le validateur des routes, tag `binding:`)
+- `internal/platform/mocks/` — mocks mockery commités (interfaces `DBTX`/`Querier`)
 - `controllers/` — handlers HTTP (structs vides, méthodes avec annotations Swagger) ; `admin.go` (backoffice), `user.go` (auth), `article.go` (métier), `auth.go` (login unifié + refresh)
 - `models/` — structs DB et services métier ; appellent le code sqlc via `pgdb.TenantStore()` / `pgdb.AdminStore()` et `pgdb.WithTenant` ; `login.go` = login unifié (`UnifiedLogin`, réponses discriminées par `kind`)
-- `forms/` — structs de validation (tags `binding:`) + maps `XxxMessages`
-- `middleware/` — CORS, RequestID, `TokenAuth()` (JWT tenant), `AdminAuth()` (JWT admin, secret séparé), `RequirePermission` (RBAC minimal owner/member)
-- `internal/db/` — code GÉNÉRÉ sqlc (ne pas éditer à la main) + `pool.go` écrit à la main : deux pools pgx (tenant `app_user` / admin `app_admin BYPASSRLS`), `WithTenant`, `postgresDSN`
-- `db/` — init Redis (`RedisDBIndex`, `InitRedis() error` (l'index vient de `REDIS_DB`)/`GetRedis`)
+- `forms/` — structs de validation (tags `binding:`) + maps `XxxMessages` ; le validateur/`Translate` vit dans `internal/platform/validate/`
+- `middleware/` — `TokenAuth()` (JWT tenant), `AdminAuth()` (JWT admin, secret séparé), `RequirePermission` (RBAC minimal owner/member) ; CORS/RequestID sont dans `internal/platform/middleware/`
 - `db/migrations/` — migrations goose versionnées (000001 baseline uuid/timestamptz, 000002 multi-tenant : rôles, tables tenant/admin, RLS, grants, 000003 `admin_user.name` varchar NOT NULL DEFAULT 'Superadmin' — table plateforme sans RLS, back-compat)
 - `db/queries/` — sources SQL de sqlc (articles, users, tenants, admins) : TOUTE requête SQL vit ici
-- `db/` racine : Redis seulement
-- `config/` — validation des 3 secrets de signature (`ValidateSigningSecrets`)
 - `cmd/e2edb/` — outil CLI d'infra des environnements jetables (drop/create de la base cible en superuser + purge de l'index `REDIS_DB` ; refuse l'index dev 1 quand `REDIS_DB` est absent), utilisé par le cycle e2e (`artisan_e2e`, index 3) et les suites Go (`artisan_test`, index 2 — chaque cible make épingle sa paire) ; garde-fous anti-DROP (nom vide / `DB_NAME` / `postgres` / `template*` refusés, identifiant quoté par pgx) + test unitaire pur
 - `invoice/` — bibliothèque de génération de factures HTML/PDF, sans route HTTP
 - `app/` — frontend Vite + React 19 + Tailwind 4 (TypeScript strict, pnpm) ; `app/.storybook/` — config Storybook (`@storybook/react-vite` 10, addons docs/a11y/themes, preview branché sur `app/src/index.css`) ; `app/src/design-system/` — palettes de tokens lues à l'exécution depuis les variables CSS de `app/src/index.css` (contrat jetons, pont « Open Design » futur) ; stories CSF colocalisées (`app/src/**/*.stories.tsx` + pages MDX) ; `app/e2e/` — specs Playwright (projet `setup` de seed + `chromium` des scénarios) ; `app/eslint.config.js` — lint flat couvrant `.storybook/` et les stories
@@ -37,13 +39,13 @@ API REST Go (Gin) avec PostgreSQL (pgx/v5 via pgxpool + requêtes sqlc, migratio
 
 ## Conventions
 
-- Ajouter une ressource : requêtes dans `db/queries/*.sql` → `make generate_sqlc` → model dans `models/` (accès via `pgdb.TenantStore()`/`pgdb.AdminStore()`, métier tenant via `pgdb.WithTenant(ctx, tenantID, func(q *pgdb.Queries) error)`) → form dans `forms/` (tags `binding:` + map `XxxMessages`) → controller dans `controllers/` → route dans `main.go` → `make generate_sqlc` (si requêtes) et `make generate_docs`
+- Ajouter une ressource : requêtes dans `db/queries/*.sql` → `make generate_sqlc` → model dans `models/` (accès via `pgdb.TenantStore()`/`pgdb.AdminStore()`, métier tenant via `pgdb.WithTenant(ctx, tenantID, func(q *pgdb.Queries) error)`) → form dans `forms/` (tags `binding:` + map `XxxMessages`) → controller dans `controllers/` → route dans `internal/app` → `make generate_sqlc` (si requêtes) et `make generate_docs`
 - Requêtes SQL uniquement dans `db/queries/*.sql` — aucune concaténation en Go (`fmt.Sprintf`, `+`), revu en review et refusé
 - Pools : opérations « plateforme » (login, register, refresh, backoffice admin) → pool admin `pgdb.AdminStore()` (rôle `app_admin BYPASSRLS`) ; tout le métier tenant → pool `pgdb.TenantStore()` + `WithTenant` (contexte RLS réglé exclusivement par `set_config(..., true)` en transaction — jamais de `SET` session-wide sur un pool partagé)
 - Login unifié (`POST /v1/login`, `AuthController.Login` → `models.UnifiedLogin`) : tentative utilisateur tenant puis repli superadmin (pool admin) ; réponse discriminée par `kind` (`tenant_user` avec user/tenant/token access+refresh, `superadmin` avec admin id/email/name/token access) ; erreurs 406 génériques à coût bcrypt constant (email inconnu → bcrypt contre un hash factice, pas d'énumération ni fuite temporelle) ; 403 propagé si tenant suspendu ; `/v1/user/login` et `/v1/admin/login` inchangés ; politique : un email superadmin ne recouvre jamais un email utilisateur tenant (utilisateur trouvé + mauvais mot de passe → 406, sans tentative admin)
 - Multi-tenant : RLS échec fermé (`FORCE ROW LEVEL SECURITY`, policy `NULLIF(current_setting('app.tenant_id', true), '')::uuid`) ; le tenant vient UNIQUEMENT du claim JWT signé (jamais d'un header/hôte client) ; `tenant`/`admin_user`/`admin_audit` sans RLS (tables plateforme)
 - Erreurs pgx : `pgx.ErrNoRows` → 404 ; `pgconn.PgError` par `Code` (`23505` unique → 406/409, `23503` FK → 409, `42501` RLS → 500) ; ne jamais renvoyer le texte SQL brut au client
-- Erreurs de validation : toujours passer par `forms.Translate(err, forms.XxxMessages)` puis `c.AbortWithStatusJSON(status, gin.H{"message": ...})`
+- Erreurs de validation : toujours passer par `validate.Translate(err, forms.XxxMessages)` (`internal/platform/validate`) puis `c.AbortWithStatusJSON(status, gin.H{"message": ...})`
 - Réponses JSON via `gin.H{"message": ...}` ; sessions JWT (Redis) gérées dans `models/auth.go` avec rotation atomique et index `user_sessions:*` ; tokens admin préfixés `admin:`, signés avec `ADMIN_ACCESS_SECRET`
 - 401 = non authentifié ; 403 = rôle insuffisant (`RequirePermission`) ou tenant suspendu
 - Commentaires godoc sur les types/fonctions exportés ; pas de commentaires superflus dans le code

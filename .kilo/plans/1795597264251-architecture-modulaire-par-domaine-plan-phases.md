@@ -10,6 +10,7 @@
 - **Risques/Validation** : aucun déplacement de code ; description étape par étape dans « Étapes détaillées — Phases 0-1 » ci-dessous ; CI verte sur la branche.
 
 ### Phase 1 — Socle `internal/platform/` + `cmd/api` + `internal/app` (comportement inchangé)
+- **[Fait 2026-11-26]** branche `refactor/modular-phase-1` (commit `3dc7869` fourchue de `d7f6a22` = `modular_archi` + L0) — gate PASS : `.kilo/plans/1795597264251-impl-log/L1-gate.md` ; équivalence routeur vide (test transitoire PASS, supprimé au commit), `TestAPISurface` vert sans édition, mocks régénérés réellement (découverte : no-op silencieux mockery corrigé), docs blobs = HEAD, `make e2e` 4 passed ; CI distante au push.
 - **Objet** : 9 `git mv` de paquets (config, redisdb, sqlc/pool, mocks, middleware pur, validate) + 2 déplacements d'entrées (`main.go`, `main_test.go` → `cmd/api/`, P1.7) + 1 création (`internal/app` ; `httpx` : voir P1.6) + mise à jour Makefile/CI/Playwright/AGENTS.md.
 - **Invariants** : **aucun handler ni réponse modifiés** — comportement inchangé au byte près.
 - **Risques/Validation** : description étape par étape dans « Étapes détaillées — Phases 0-1 » ci-dessous ; `make test` + `make e2e` verts en fin de phase.
