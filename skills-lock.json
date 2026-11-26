@@ -1,6 +1,13 @@
 {
   "version": 2,
   "skills": {
+    "agent-rules": {
+      "source": "netresearch/agent-rules-skill",
+      "commit": "dee12f1dcc828d82c2427bb041f212081f065a43",
+      "sourceType": "github",
+      "skillPath": "skills/agent-rules/SKILL.md",
+      "computedHash": "f2455cac8df2bb9f4f9b2390059d905932780bf76cf8e1903e74bf87b8779455"
+    },
     "ponytail": {
       "source": "DietrichGebert/ponytail",
       "commit": "ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10",
